@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  DRIVER
+}
+
+enum RideStatus {
+  DRAFT
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentProvider {
+  STRIPE
+  VIVA
+}
+
+enum PaymentStatus {
+  REQUIRES_ACTION
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model Tenant {
+  id            String            @id @default(uuid())
+  name          String
+  businessId    String // yTunnus
+  settingsJson  Json?
+  memberships   Membership[]
+  drivers       DriverProfile[]
+  pricing       PricingPolicy[]
+  rides         Ride[]
+  providerAccts ProviderAccount[]
+  invitations   Invitation[]
+  payments      Payment[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  deletedAt     DateTime?
+
+  @@index([businessId])
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  username      String?
+  passwordHash  String
+  status        String // ACTIVE, LOCKED, etc.
+  memberships   Membership[]
+  driverProfile DriverProfile?
+  invitations   Invitation[]   // invitations sent by this user
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Membership {
+  id        String   @id @default(uuid())
+  userId    String
+  tenantId  String
+  role      Role
+  invitedBy String?
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId, role])
+}
+
+model Invitation {
+  id              String    @id @default(uuid())
+  tenantId        String
+  email           String
+  role            Role
+  token           String    @unique
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  invitedByUserId String?
+  driverProfileId String?
+
+  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedByUser User?  @relation(fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  driverProfile DriverProfile? @relation(fields: [driverProfileId], references: [id], onDelete: SetNull)
+}
+
+model DriverProfile {
+  id          String       @id @default(uuid())
+  tenantId    String
+  userId      String?      @unique // null until invitation accepted
+  firstName   String
+  lastName    String
+  phone       String?
+  status      String       // INVITED, ACTIVE, INACTIVE
+  rides       Ride[]
+  invitations Invitation[] // invitations for this driver profile
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model PricingPolicy {
+  id        String    @id @default(uuid())
+  tenantId  String
+  name      String
+  baseFare  Decimal   @db.Decimal(10, 2)
+  perMinute Decimal   @db.Decimal(10, 4)
+  perKm     Decimal   @db.Decimal(10, 4)
+  validFrom DateTime
+  validTo   DateTime?
+  isActive  Boolean   @default(false)
+  rides     Ride[]
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, validFrom, validTo])
+  @@unique([tenantId, isActive]) // Prevents multiple active policies per tenant
+}
+
+model Ride {
+  id              String        @id @default(uuid())
+  tenantId        String        // Every ride must belong to a tenant
+  driverProfileId String
+  pricingPolicyId String?
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMin     Decimal?      @db.Decimal(10, 2)
+  distanceKm      Decimal?      @db.Decimal(10, 3)
+  fareSubtotal    Decimal?      @db.Decimal(10, 2)
+  taxAmount       Decimal?      @db.Decimal(10, 2)
+  fareTotal       Decimal?      @db.Decimal(10, 2)
+  status          RideStatus
+  payment         Payment?
+  links           PaymentLink[]
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  driverProfile DriverProfile  @relation(fields: [driverProfileId], references: [id])
+  pricing       PricingPolicy? @relation(fields: [pricingPolicyId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([driverProfileId])
+  @@index([startedAt])
+}
+
+model Payment {
+  id                String          @id @default(uuid())
+  rideId            String          @unique
+  tenantId          String
+  provider          PaymentProvider
+  amount            Decimal         @db.Decimal(10, 2)
+  currency          String          @default("EUR")
+  status            PaymentStatus
+  authorizedAt      DateTime?
+  capturedAt        DateTime?
+  failureCode       String?
+  externalPaymentId String? // e.g. pi_xxx or Viva transaction id
+
+  ride   Ride   @relation(fields: [rideId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status])
+}
+
+model PaymentLink {
+  id        String          @id @default(uuid())
+  rideId    String
+  provider  PaymentProvider
+  url       String
+  status    String // ACTIVE|EXPIRED|CONSUMED
+  createdAt DateTime        @default(now())
+  expiresAt DateTime?
+
+  ride Ride @relation(fields: [rideId], references: [id])
+
+  @@index([rideId, status])
+}
+
+model ProviderAccount {
+  id                String          @id @default(uuid())
+  tenantId          String
+  provider          PaymentProvider
+  externalAccountId String // Stripe acct_... or Viva merchant id
+  accessTokenEnc    String?
+  refreshTokenEnc   String?
+  scope             String?
+  livemode          Boolean         @default(false)
+  connectedAt       DateTime?
+  metadataJson      Json?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, provider])
+}
+
+model WebhookEvent {
+  id           String          @id @default(uuid())
+  provider     PaymentProvider
+  eventType    String
+  externalId   String          @unique
+  receivedAt   DateTime        @default(now())
+  payloadJson  Json
+  processedAt  DateTime?
+  attemptCount Int             @default(0)
+
+  @@index([provider, eventType])
+}
