@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { DriverLoginDto } from './dto/driver-login.dto';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -96,6 +97,64 @@ export class AuthService {
     };
     
     return this.generateToken(userWithMemberships);
+  }
+
+  async loginDriver(driverLoginDto: DriverLoginDto) {
+    // First validate user credentials
+    const user = await this.validateUser(driverLoginDto.email, driverLoginDto.password);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Check if user has DRIVER role in any tenant
+    const driverMembership = user.memberships?.find(m => m.role === 'DRIVER');
+    if (!driverMembership) {
+      throw new UnauthorizedException('User is not authorized as a driver');
+    }
+
+    // Get the driver profile
+    const driverProfile = await (this.prisma as any).driverProfile.findFirst({
+      where: { 
+        userId: user.id,
+        tenantId: driverMembership.tenantId 
+      },
+      include: {
+        tenant: true
+      }
+    });
+
+    if (!driverProfile) {
+      throw new UnauthorizedException('Driver profile not found');
+    }
+
+    // Check if driver profile is active
+    if (driverProfile.status !== 'ACTIVE') {
+      throw new UnauthorizedException(`Driver account is ${driverProfile.status.toLowerCase()}. Please contact your administrator.`);
+    }
+
+    // Generate JWT with driver-specific claims
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      type: 'driver',
+      driverProfileId: driverProfile.id,
+      tenantId: driverProfile.tenantId,
+      role: 'DRIVER'
+    };
+
+    return {
+      access_token: this.jwtService.sign(payload),
+      expires_in: this.config.get('JWT_EXPIRES_IN'),
+      driver: {
+        id: driverProfile.id,
+        firstName: driverProfile.firstName,
+        lastName: driverProfile.lastName,
+        phone: driverProfile.phone,
+        status: driverProfile.status,
+        tenantId: driverProfile.tenantId,
+        tenantName: driverProfile.tenant.name
+      }
+    };
   }
 
   private generateToken(user: any) {
