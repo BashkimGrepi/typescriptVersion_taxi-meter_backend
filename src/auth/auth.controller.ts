@@ -6,11 +6,10 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from 'src/decorators/public.decorator';
 import { UserResponseDto } from './dto/user-response.dto';
 
-
-@UseGuards(JwtAuthGuard)
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
+  
   @Public()
   @Post('login')
   async login(@Body() loginDto: LoginDto) {
@@ -23,9 +22,11 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('me')
   getProfile(@Request() req) {
     return new UserResponseDto(req.user);
-  }
+    }
+    
+
+
 }
