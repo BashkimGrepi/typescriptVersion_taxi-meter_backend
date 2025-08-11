@@ -33,6 +33,17 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum PaymentMethod {
+  CASH
+  CARD
+}
+
+enum PaymentProviderStatus {
+  CONNECTED
+  PENDING
+  DISCONNECTED
+}
+
 model Tenant {
   id            String            @id @default(uuid())
   name          String
@@ -149,9 +160,9 @@ model Ride {
   payment         Payment?
   links           PaymentLink[]
 
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
-  driverProfile DriverProfile  @relation(fields: [driverProfileId], references: [id])
-  pricing       PricingPolicy? @relation(fields: [pricingPolicyId], references: [id])
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  driverProfile DriverProfile  @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  pricing       PricingPolicy? @relation(fields: [pricingPolicyId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, status])
   @@index([driverProfileId])
@@ -171,8 +182,8 @@ model Payment {
   failureCode       String?
   externalPaymentId String? // e.g. pi_xxx or Viva transaction id
 
-  ride   Ride   @relation(fields: [rideId], references: [id])
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status])
 }
@@ -186,7 +197,7 @@ model PaymentLink {
   createdAt DateTime        @default(now())
   expiresAt DateTime?
 
-  ride Ride @relation(fields: [rideId], references: [id])
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
 
   @@index([rideId, status])
 }
@@ -203,7 +214,7 @@ model ProviderAccount {
   connectedAt       DateTime?
   metadataJson      Json?
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, provider])
 }
