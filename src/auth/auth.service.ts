@@ -151,6 +151,7 @@ export class AuthService {
         lastName: driverProfile.lastName,
         phone: driverProfile.phone,
         status: driverProfile.status,
+        role: 'DRIVER',
         tenantId: driverProfile.tenantId,
         tenantName: driverProfile.tenant.name
       }

@@ -18,8 +18,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string; email: string; roles: any[] }) {
-    // First get the user
+  async validate(payload: { sub: string; email: string; type?: string; role?: string; driverProfileId?: string; tenantId?: string; roles?: any[] }) {
+    // If this is a driver token with type field, use the payload data
+    if (payload.type === 'driver') {
+      return {
+        sub: payload.sub,
+        email: payload.email,
+        type: payload.type,
+        role: payload.role,
+        driverProfileId: payload.driverProfileId,
+        tenantId: payload.tenantId
+      };
+    }
+    
+    // For regular users, fetch from database
     const user = await (this.prisma as any).user.findUnique({
       where: { id: payload.sub }
     });
