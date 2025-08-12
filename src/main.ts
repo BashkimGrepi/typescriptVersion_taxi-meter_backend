@@ -14,7 +14,7 @@ async function bootstrap() {
   await prismaService.enableShutdownHooks(app);
 
   const reflector = app.get(Reflector);
-  app.useGlobalGuards(new JwtGlobalGuard(reflector));
+  app.useGlobalGuards(new JwtGlobalGuard(reflector)); // applies JWT protection to entire application
 
   await app.listen(process.env.PORT ?? 3000);
   

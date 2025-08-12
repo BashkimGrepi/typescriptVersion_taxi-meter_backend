@@ -7,6 +7,8 @@ import { RegisterDto } from './dto/register.dto';
 import { DriverLoginDto } from './dto/driver-login.dto';
 import { ConfigService } from '@nestjs/config';
 
+// Token creation
+
 @Injectable()
 export class AuthService {
   constructor(

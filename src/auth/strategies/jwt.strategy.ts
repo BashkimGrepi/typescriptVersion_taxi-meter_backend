@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 
+// Strategy for validating JWT tokens
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -18,6 +19,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
+    // Validates incoming JWT tokens and extracts user data
   async validate(payload: { sub: string; email: string; type?: string; role?: string; driverProfileId?: string; tenantId?: string; roles?: any[] }) {
     // If this is a driver token with type field, use the payload data
     if (payload.type === 'driver') {

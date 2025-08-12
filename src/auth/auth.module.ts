@@ -9,16 +9,21 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { PassportModule } from '@nestjs/passport';
 import { PrismaModule } from 'src/prisma/prisma.module';
 
+// JWT Configuration
+
 @Module({
     imports: [
     PassportModule,
     PrismaModule,
+        //Sets up JWT module with environment-based configuration
+        //Injects JwtService throughout the application
+        //Configures token signin and expiration
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+        secret: configService.get<string>('JWT_SECRET'), // Secret key for signing/verifying tokens
         signOptions: { 
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '1h') 
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '1h') // Token expiration time 
         },
       }),
       inject: [ConfigService],
