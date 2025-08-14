@@ -59,6 +59,7 @@ model Tenant {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   deletedAt     DateTime?
+  oauthStates   OAuthState[]
 
   @@index([businessId])
 }
@@ -180,7 +181,7 @@ model Payment {
   authorizedAt      DateTime?
   capturedAt        DateTime?
   failureCode       String?
-  externalPaymentId String? // e.g. pi_xxx or Viva transaction id
+  externalPaymentId String? // e.g. pi_xxx or Viva transaction id, platform-observed stripe object ID
 
   ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -230,4 +231,24 @@ model WebhookEvent {
   attemptCount Int             @default(0)
 
   @@index([provider, eventType])
+}
+
+
+model OAuthState {
+  id        String   @id @default(uuid())
+  nonce     String   @unique
+  tenantId  String
+  userId    String
+  provider  PaymentProvider // STRIPE or VIVA
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  consumed  Boolean  @default(false) // Prevents replay attacks
+  
+  // Optional: Foreign key relations for data integrity
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // Note: Can't relate to User directly since User.id is String but we might store different ID format
+  
+  @@index([nonce])
+  @@index([expiresAt])
+  @@index([tenantId, provider])
 }
