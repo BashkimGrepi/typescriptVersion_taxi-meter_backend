@@ -7,6 +7,7 @@ import { DriversModule } from './drivers/drivers.module';
 import { RidesModule } from './rides/rides.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './modules/health/health.module';
+import { PaymentsModule } from './payments/payments.module';
 
 import { ConfigModule } from '@nestjs/config';
 
@@ -22,6 +23,7 @@ import { ConfigModule } from '@nestjs/config';
     RidesModule, 
     PrismaModule, 
     HealthModule,
+    PaymentsModule,
     
   ],
   controllers: [AppController],
