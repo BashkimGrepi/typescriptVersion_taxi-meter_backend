@@ -10,6 +10,15 @@ async function bootstrap() {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
   
+
+  app.enableCors({
+    origin: ['http://localhost:5173'], // admin dashboard
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    credentials: true,
+    maxAge: 86400,
+  });
+
   // Swagger configuration
   const config = new DocumentBuilder()
     .setTitle('Taxi Meter API')

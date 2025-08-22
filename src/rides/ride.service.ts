@@ -73,6 +73,7 @@ export class RideService {
         };
     }
 
+  // start Ride -> for mobile application
     async startRide(args: { dto: StartRideDto; userId: string; tenantId: string }): Promise<StartRideResponseDto>{
         const { dto, userId, tenantId } = args;
 
@@ -147,6 +148,7 @@ export class RideService {
         return this.mapRideToStartRideResponseDto(newRide);
     }
 
+  // end Ride -> for mobile application
   async endRide(args: { dto: EndRideDto; userId: string; tenantId: string }): Promise<EndRideResponseDto> {
     const { dto, userId, tenantId } = args;
 

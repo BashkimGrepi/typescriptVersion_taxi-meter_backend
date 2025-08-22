@@ -14,7 +14,7 @@ import type { DriverInfo } from '../decorators/driver.decorator';
 import { UpdateDriverProfileDto } from './dto/update-driver-profile.dto';
 import { DriverProfileResponseDto } from './dto/driver-profile-response.dto';
 
-@Controller('api/driver')
+@Controller('/driver')
 @UseGuards(JwtAuthGuard, DriverGuard)
 export class DriverProfileController {
   constructor(private driverProfileService: DriverProfileService) {}

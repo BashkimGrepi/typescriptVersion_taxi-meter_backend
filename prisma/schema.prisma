@@ -170,6 +170,7 @@ model Ride {
   @@index([tenantId, status])
   @@index([driverProfileId])
   @@index([startedAt])
+  @@index([tenantId, endedAt])
 }
 
 model Payment {
