@@ -46,6 +46,16 @@ enum PaymentProviderStatus {
   DISCONNECTED
 }
 
+enum NumberSequenceType {
+  RECEIPT
+  INVOICE
+}
+
+enum ExportArchiveType {
+  simplified
+  full
+}
+
 model Tenant {
   id            String            @id @default(uuid())
   name          String
@@ -185,11 +195,44 @@ model Payment {
   capturedAt        DateTime?
   failureCode       String?
   externalPaymentId String? // e.g. pi_xxx or Viva transaction id, platform-observed stripe object ID
+  receiptNumber     String? // for the simplified monthly payment pdf receipt
+  invoiceNumber     String?
+  numberPeriod      String? // '202508' -> null until assigned
 
   ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status])
+  @@unique([tenantId, numberPeriod, receiptNumber])
+  @@unique([tenantId, numberPeriod, invoiceNumber])
+  @@index([tenantId, capturedAt])
+}
+
+model NumberSequence {
+  id          String              @id @default(uuid())
+  tenantId    String
+  type        NumberSequenceType
+  period      String              // 'YYYYMM'
+  current     Int
+  createdAt   DateTime            @default(now())
+
+  @@unique([tenantId, type, period])
+}
+
+model ExportArchive {
+  id              String              @id @default(uuid())
+  tenantId        String
+  period          String
+  type            ExportArchiveType
+  createdAt       DateTime            @default(now())
+  createdByUserId String
+  pdfPath         String
+  jsonPath        String
+  sha256          String
+  count           Int
+  totalAmount     Decimal             @db.Decimal(10, 2)
+
+  @@index([tenantId, period, type])
 }
 
 model PaymentLink {
