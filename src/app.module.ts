@@ -12,6 +12,7 @@ import { ReportsModule } from './reports/reports.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { AdminModule } from './admin/admin.module';
 import { ConfigModule } from '@nestjs/config';
+import { ExportsModule } from './exports/exports.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ConfigModule } from '@nestjs/config';
     ReportsModule,
     TenantsModule,
     AdminModule,
+    ExportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
