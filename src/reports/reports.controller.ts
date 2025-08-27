@@ -17,7 +17,7 @@ export class ReportsController {
         console.log("req.user = ", req.user);
         if (!req.user) throw new UnauthorizedException('Missing auth');
 
-        // be tolerant: support both tenantId and tid
+        
         const tenantId = req.user.tenantId ?? req.user.tid;
         if (!tenantId) throw new ForbiddenException('Missing tenant id on token');
 
