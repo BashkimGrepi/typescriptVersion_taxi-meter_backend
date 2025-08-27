@@ -39,7 +39,7 @@ export class AuthService {
   /**
    * ADMIN / MANAGER login — returns a tenant-scoped token.
    * If user has multiple memberships and no tenantId is provided,
-   * returns a selection list instead of a token.
+   * returns a selection list (with loginTicket) instead of a token.
    */
   async login(loginDto: LoginDto) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
@@ -66,6 +66,17 @@ export class AuthService {
 
     if (!chosenTenantId) {
       // Ask client to choose a tenant; do NOT mint a token yet
+      // NEW: also return a short-lived loginTicket
+      const loginTicket = await this.jwtService.signAsync(
+        { sub: user.id, purpose: 'tenant_selection' },
+        {
+          secret: this.config.get('JWT_TICKET_SECRET'),
+          expiresIn: this.config.get('JWT_TICKET_EXPIRES') ?? '300s',
+          audience: 'tenant-selection',
+          
+        },
+      );
+
       return {
         requiresTenantSelection: true,
         tenants: memberships.map((m) => ({
@@ -73,21 +84,30 @@ export class AuthService {
           tenantName: m.tenant.name,
           role: m.role,
         })),
+        loginTicket,
       };
     }
 
     const mem = memberships.find((m) => m.tenantId === chosenTenantId);
     if (!mem) throw new ForbiddenException('User does not have access to this tenant');
 
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      role: mem.role, // e.g. 'ADMIN'
-      tenantId: chosenTenantId,
-      tenantName: mem.tenant.name, // optional, handy for UI
-    };
-
-    const accessToken = await this.jwtService.signAsync(payload);
+    // CHANGED: final access token has type:'access' and uses consistent JWT_SECRET
+    const accessToken = await this.jwtService.signAsync(
+      {
+        sub: user.id,
+        email: user.email,
+        role: mem.role, // e.g. 'ADMIN'
+        tenantId: chosenTenantId,
+        tenantName: mem.tenant.name, // optional, handy for UI
+        type: 'access',
+      },
+      {
+        secret: this.config.get('JWT_SECRET'),
+        expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '3600s',
+        audience: 'api',
+        
+      },
+    );
 
     return {
       access_token: accessToken,
@@ -99,7 +119,7 @@ export class AuthService {
   /**
    * DRIVER login — returns a tenant-scoped driver token.
    * If the driver has profiles in multiple tenants and no tenant is specified,
-   * returns a selection list instead of a token.
+   * returns a selection list (with loginTicket) instead of a token.
    */
   async loginDriver(dto: DriverLoginDto) {
     const user = await this.validateUser(dto.email, dto.password);
@@ -133,25 +153,163 @@ export class AuthService {
       profile = match;
     } else if (profiles.length > 1) {
       // Multiple tenants: ask client to choose
+      // NEW: include loginTicket
+      const loginTicket = await this.jwtService.signAsync(
+        { sub: user.id, purpose: 'tenant_selection' },
+        {
+          secret: this.config.get('JWT_TICKET_SECRET'),
+          expiresIn: this.config.get('JWT_TICKET_EXPIRES') ?? '300s',
+          audience: 'tenant-selection',
+          
+        },
+      );
+
       return {
         requiresTenantSelection: true,
         tenants: profiles.map((p) => ({
           tenantId: p.tenantId,
           tenantName: p.tenant.name,
         })),
+        loginTicket,
       };
     }
 
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      type: 'driver',
-      driverProfileId: profile.id,
-      tenantId: profile.tenantId,
-      role: 'DRIVER',
-    };
+    // CHANGED: final access token has type:'access' and uses consistent JWT_SECRET
+    const accessToken = await this.jwtService.signAsync(
+      {
+        sub: user.id,
+        email: user.email,
+        type: 'access',            // important for strategy to accept
+        driverProfileId: profile.id,
+        tenantId: profile.tenantId,
+        role: 'DRIVER',
+      },
+      {
+        secret: this.config.get('JWT_SECRET'),
+        expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '3600s',
+        audience: 'api',
+        
+      },
+    );
 
-    const accessToken = await this.jwtService.signAsync(payload);
+    return {
+      access_token: accessToken,
+      token_type: 'Bearer',
+      expires_in: this.config.get('JWT_EXPIRES_IN'),
+      driver: {
+        id: profile.id,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        phone: profile.phone,
+        status: profile.status,
+        role: 'DRIVER',
+        tenantId: profile.tenantId,
+        tenantName: profile.tenant.name,
+      },
+    };
+  }
+
+  /**
+   * EXCHANGE (Step 2) — ADMIN/MANAGER:
+   * Accepts { loginTicket, tenantId } and returns the final tenant-scoped access token.
+   */
+  async selectTenant(dto: { loginTicket: string; tenantId: string }) {
+    // Verify ticket with TICKET secret + audience
+    const decoded = await this.jwtService.verifyAsync(dto.loginTicket, {
+      secret: this.config.get('JWT_TICKET_SECRET'),
+      audience: 'tenant-selection',
+    });
+    if (decoded?.purpose !== 'tenant_selection') {
+      throw new UnauthorizedException('Invalid ticket purpose');
+    }
+
+    // Fresh membership check
+    const membership = await this.prisma.membership.findFirst({
+      where: { userId: decoded.sub, tenantId: dto.tenantId },
+      select: {
+        role: true,
+        tenantId: true,
+        tenant: { select: { name: true } },
+        user: { select: { id: true, email: true } },
+      },
+    });
+    if (!membership) throw new ForbiddenException('Not a member of this tenant');
+
+    // Final access token (consistent JWT_SECRET)
+    const accessToken = await this.jwtService.signAsync(
+      {
+        sub: membership.user.id,
+        email: membership.user.email,
+        role: membership.role,
+        tenantId: membership.tenantId,
+        tenantName: membership.tenant.name,
+        type: 'access',
+      },
+      {
+        secret: this.config.get('JWT_SECRET'),
+        expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '3600s',
+        audience: 'api',
+        
+      },
+    );
+
+    return {
+      access_token: accessToken,
+      token_type: 'Bearer',
+      expires_in: this.config.get('JWT_EXPIRES_IN'),
+      user: { id: membership.user.id, email: membership.user.email },
+      tenant: { id: membership.tenantId, name: membership.tenant.name },
+      role: membership.role,
+    };
+  }
+
+  /**
+   * EXCHANGE (Step 2) — DRIVER:
+   * Accepts { loginTicket, tenantId } and returns the final driver access token.
+   */
+  async selectTenantDriver(dto: { loginTicket: string; tenantId: string }) {
+    // Verify ticket with TICKET secret + audience
+    const decoded = await this.jwtService.verifyAsync(dto.loginTicket, {
+      secret: this.config.get('JWT_TICKET_SECRET'),
+      audience: 'tenant-selection',
+    });
+    if (decoded?.purpose !== 'tenant_selection') {
+      throw new UnauthorizedException('Invalid ticket purpose');
+    }
+
+    // Fresh driver profile check
+    const profile = await this.prisma.driverProfile.findFirst({
+      where: { userId: decoded.sub, tenantId: dto.tenantId, status: 'ACTIVE' },
+      select: {
+        id: true,
+        tenantId: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        status: true,
+        tenant: { select: { name: true } },
+        user: { select: { id: true, email: true } },
+      },
+    });
+    if (!profile) throw new ForbiddenException('Not a driver in the selected tenant');
+
+    // Final access token (consistent JWT_SECRET)
+    const accessToken = await this.jwtService.signAsync(
+      {
+        sub: profile.user!.id,
+        email: profile.user!.email,
+        type: 'access',
+        driverProfileId: profile.id,
+        tenantId: profile.tenantId,
+        role: 'DRIVER',
+      },
+      {
+        secret: this.config.get('JWT_SECRET'),
+        expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '3600s',
+        audience: 'api',
+        
+      },
+    );
 
     return {
       access_token: accessToken,
@@ -205,15 +363,23 @@ export class AuthService {
       data: { userId: user.id, tenantId: tenant.id, role: 'ADMIN' },
     });
 
-    // Issue tenant-scoped token
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      role: 'ADMIN',
-      tenantId: tenant.id,
-      tenantName: tenant.name,
-    };
-    const accessToken = await this.jwtService.signAsync(payload);
+    // Issue tenant-scoped token (consistent JWT_SECRET)
+    const accessToken = await this.jwtService.signAsync(
+      {
+        sub: user.id,
+        email: user.email,
+        role: 'ADMIN',
+        tenantId: tenant.id,
+        tenantName: tenant.name,
+        type: 'access',
+      },
+      {
+        secret: this.config.get('JWT_SECRET'),
+        expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '3600s',
+        audience: 'api',
+        
+      },
+    );
 
     return {
       access_token: accessToken,
