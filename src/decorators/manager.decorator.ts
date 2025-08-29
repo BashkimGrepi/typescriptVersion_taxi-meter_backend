@@ -1,29 +1,29 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
-export interface DriverInfo {
+export interface ManagerInfo {
   userId: string;
   email: string;
-  driverProfileId: string;
   tenantId: string;
+  tenantName: string;
   role: string;
   type: string;
 }
 
-export const Driver = createParamDecorator(
-  (data: unknown, ctx: ExecutionContext): DriverInfo => {
+export const Manager = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext): ManagerInfo => {
     const request = ctx.switchToHttp().getRequest();
     const user = request.user;
 
-    // Ensure this is a driver user (check role and driverProfileId)
-    if (!user || user.role !== 'DRIVER' || !user.driverProfileId) {
-      throw new Error('Not a driver user');
+    // Ensure this is a manager user
+    if (!user || user.role !== 'MANAGER') {
+      throw new Error('Not a manager user');
     }
 
     return {
       userId: user.sub,
       email: user.email,
-      driverProfileId: user.driverProfileId,
       tenantId: user.tenantId,
+      tenantName: user.tenantName || '', // Available in manager tokens
       role: user.role,
       type: user.type || 'access'
     };
