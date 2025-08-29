@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "version": "payments-export/v1",
+    "type": "simplified",
+    "period": {
+      "from": "2025-08-01T00:00:00.000Z",
+      "to": "2025-09-01T00:00:00.000Z",
+      "yyyymm": "202508"
+    },
+    "tenant": {
+      "id": "1c605ccc-8094-42e0-a0c9-7347600bd551",
+      "name": "MetroTaxi Oy",
+      "businessId": "1234567-8",
+      "vatId": null
+    },
+    "generatedAt": "2025-08-27T15:50:35.457Z",
+    "generatedBy": {
+      "userId": "e90fc8a7-b3ce-4991-a804-3f14bbe96d9b",
+      "email": "admin@metrotaxi.test"
+    },
+    "numbering": {
+      "period": "202508",
+      "startingNumber": 2,
+      "endingNumber": 2,
+      "assignedCount": 0,
+      "alreadyNumberedCount": 1
+    }
+  },
+  "vat": {
+    "summaryByRate": [
+      {
+        "rate": 0.14,
+        "count": 1,
+        "base": "37.79",
+        "tax": "5.29",
+        "total": "43.08"
+      }
+    ],
+    "summaryByRateAndMethod": [
+      {
+        "rate": 0.14,
+        "count": 1,
+        "base": "37.79",
+        "tax": "5.29",
+        "total": "43.08"
+      }
+    ]
+  },
+  "payments": [
+    {
+      "paymentId": "b2a28e04-2ffa-4805-94d7-1ccdcb9d6029",
+      "receiptNumber": "R-202508-0002",
+      "capturedAt": "2025-08-01T00:27:00.000Z",
+      "serviceDate": "2025-08-01T00:27:00.000Z",
+      "description": "Passenger transport",
+      "rate": 0.14,
+      "base": "37.79",
+      "tax": "5.29",
+      "total": "43.08",
+      "currency": "EUR",
+      "driverName": "Anna Kuljettaja",
+      "rideId": "bee937bb-1508-4b2f-b5ba-611aa92fc678",
+      "externalPaymentId": "viva_bee937bb"
+    }
+  ],
+  "exceptions": {
+    "ridesWithoutPayments": [],
+    "paymentsWithoutRide": [],
+    "warnings": []
+  },
+  "annex": {
+    "enabled": false
+  },
+  "sha256": "b3b36cea2aa8398b1bfead7f7829e74e42c0791029d6236f55c60919ec48e02b"
+}
