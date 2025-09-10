@@ -1,7 +1,6 @@
 import { IsNotEmpty, IsString } from "class-validator";
 
-
-export class SelectTenantDriverDto {
+export class SelectTenantDto {
     @IsNotEmpty()
     @IsString()
     tenantId!: string;
@@ -9,5 +8,4 @@ export class SelectTenantDriverDto {
     @IsNotEmpty()
     @IsString()
     loginTicket!: string;
-
 }

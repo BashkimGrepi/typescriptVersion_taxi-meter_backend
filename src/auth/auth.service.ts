@@ -7,9 +7,9 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
-import { DriverLoginDto } from './dto/driver-login.dto';
+import { LoginDto } from './dto/admin/login.dto';
+import { RegisterDto } from './dto/admin/register.dto';
+import { LoginDto as DriverLoginDto } from './dto/driver/login.dto';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()

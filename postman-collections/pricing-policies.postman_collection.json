@@ -1,0 +1,515 @@
+{
+  "info": {
+    "name": "Taxi Meter - Pricing Policies API",
+    "description": "Complete collection for testing pricing policy endpoints with different user roles",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenant_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "policy_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Authentication",
+      "item": [
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.access_token) {",
+                  "        pm.collectionVariables.set('access_token', response.access_token);",
+                  "        console.log('Admin token saved');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@demo.com\",\n  \"password\": \"AdminPass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login Manager",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.access_token) {",
+                  "        pm.collectionVariables.set('access_token', response.access_token);",
+                  "        console.log('Manager token saved');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"manager@demo.com\",\n  \"password\": \"ManagerPass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login Driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.access_token) {",
+                  "        pm.collectionVariables.set('access_token', response.access_token);",
+                  "        console.log('Driver token saved');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"driver@demo.com\",\n  \"password\": \"DriverPass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/driver/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "driver", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 List Pricing Policies",
+      "item": [
+        {
+          "name": "Get All Policies (Admin/Manager)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pricing-policies",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies"]
+            }
+          }
+        },
+        {
+          "name": "Get All Policies with Pagination",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pricing-policies?limit=10&offset=0&orderBy=name&orderDir=asc",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "orderBy",
+                  "value": "name"
+                },
+                {
+                  "key": "orderDir",
+                  "value": "asc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Active Policies Only",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pricing-policies?isActive=true",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies"],
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Policies by Name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pricing-policies?search=standard",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "standard"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "➕ Create Pricing Policy",
+      "item": [
+        {
+          "name": "Create Standard Policy (Admin/Manager)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.id) {",
+                  "        pm.collectionVariables.set('policy_id', response.id);",
+                  "        console.log('Policy ID saved:', response.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Standard City Rate\",\n  \"baseFare\": \"3.50\",\n  \"perKm\": \"1.20\",\n  \"isActive\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pricing-policies",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies"]
+            }
+          }
+        },
+        {
+          "name": "Create Premium Policy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Premium Night Rate\",\n  \"baseFare\": \"5.00\",\n  \"perKm\": \"1.80\",\n  \"isActive\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pricing-policies",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies"]
+            }
+          }
+        },
+        {
+          "name": "Create Budget Policy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Budget Daytime Rate\",\n  \"baseFare\": \"2.50\",\n  \"perKm\": \"0.90\",\n  \"isActive\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pricing-policies",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "✏️ Update Pricing Policy",
+      "item": [
+        {
+          "name": "Update Policy Name (Admin/Manager)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Standard Rate\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pricing-policies/update/{{policy_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies", "update", "{{policy_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Policy Rates",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"baseFare\": \"4.00\",\n  \"perKm\": \"1.50\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pricing-policies/update/{{policy_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies", "update", "{{policy_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Full Policy",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Complete Updated Policy\",\n  \"baseFare\": \"3.75\",\n  \"perKm\": \"1.25\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pricing-policies/update/{{policy_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies", "update", "{{policy_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔄 Activate Policy",
+      "item": [
+        {
+          "name": "Activate Policy (Admin Only)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pricing-policies/{{policy_id}}/activate",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies", "{{policy_id}}", "activate"]
+            }
+          }
+        },
+        {
+          "name": "⚠️ Activate Policy (Manager - Should Fail)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pricing-policies/{{policy_id}}/activate",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies", "{{policy_id}}", "activate"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👁️ View Active Policies",
+      "item": [
+        {
+          "name": "Get Current Active Policy (Any Role)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pricing-policies/active/current",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies", "active", "current"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Policy for Driver",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pricing-policies/active/driver",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies", "active", "driver"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "❌ Security Tests",
+      "item": [
+        {
+          "name": "🚫 Driver tries to list all policies (Should Fail)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pricing-policies",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies"]
+            }
+          }
+        },
+        {
+          "name": "🚫 Driver tries to create policy (Should Fail)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Unauthorized Policy\",\n  \"baseFare\": \"10.00\",\n  \"perKm\": \"5.00\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pricing-policies",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies"]
+            }
+          }
+        },
+        {
+          "name": "🚫 Manager tries to activate (Should Fail)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pricing-policies/{{policy_id}}/activate",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies", "{{policy_id}}", "activate"]
+            }
+          }
+        },
+        {
+          "name": "🚫 No token (Should Fail)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pricing-policies",
+              "host": ["{{base_url}}"],
+              "path": ["pricing-policies"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

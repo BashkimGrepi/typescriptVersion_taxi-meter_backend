@@ -2,7 +2,7 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
 import { JwtGlobalGuard } from './auth/guards/jwt-global.guard';
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
@@ -43,6 +43,13 @@ async function bootstrap() {
 
   const reflector = app.get(Reflector);
   app.useGlobalGuards(new JwtGlobalGuard(reflector)); // applies JWT protection to entire application
+
+  // Enable global validation with transformation
+  app.useGlobalPipes(new ValidationPipe({
+    transform: true, // Automatically transform payloads to DTO instances
+    whitelist: true, // Strip properties that don't have decorators
+    forbidNonWhitelisted: true, // Throw error if non-whitelisted properties are present
+  }));
 
   await app.listen(process.env.PORT ?? 3000);
   

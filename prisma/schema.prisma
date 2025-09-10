@@ -143,18 +143,18 @@ model PricingPolicy {
   tenantId  String
   name      String
   baseFare  Decimal   @db.Decimal(10, 2)
-  perMinute Decimal   @db.Decimal(10, 4)
   perKm     Decimal   @db.Decimal(10, 4)
-  validFrom DateTime
-  validTo   DateTime?
   isActive  Boolean   @default(false)
-  rides     Ride[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+  ride      Ride[]
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, isActive])
-  @@index([tenantId, validFrom, validTo])
-  @@unique([tenantId, isActive]) // Prevents multiple active policies per tenant
+  @@index([tenantId, updatedAt])
+ // note: 'single active policy per tenant' is enforced via postgresql
+ // partial unique index added in sql migration
 }
 
 model Ride {

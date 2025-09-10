@@ -199,14 +199,14 @@ export class RideService {
     let pricing = ride.pricingPolicyId
       ? await this.prisma.pricingPolicy.findUnique({
           where: { id: ride.pricingPolicyId },
-          select: { id: true, baseFare: true, perMinute: true, perKm: true },
+          select: { id: true, baseFare: true, perKm: true },
         })
       : null;
 
     if (!pricing) {
       pricing = await this.prisma.pricingPolicy.findFirst({
         where: { tenantId, isActive: true },
-        select: { id: true, baseFare: true, perMinute: true, perKm: true },
+        select: { id: true, baseFare: true, perKm: true },
       });
     }
     if (!pricing) {
@@ -221,10 +221,9 @@ export class RideService {
     const dDuration = new Prisma.Decimal(durationMinutes).toDP(2);
 
     const base = pricing.baseFare;
-    const timeComponent = pricing.perMinute.mul(dDuration);
     const distanceComponent = pricing.perKm.mul(dDistance);
 
-    const subtotalBeforeMult = base.add(timeComponent).add(distanceComponent);
+    const subtotalBeforeMult = base.add(distanceComponent);
     const subtotal = subtotalBeforeMult.mul(multiplier).toDP(2);
 
     const taxRate = new Prisma.Decimal(process.env.DEFAULT_TAX_RATE ?? '0.00');
@@ -279,7 +278,6 @@ export class RideService {
     // 9) Build response with a friendly fare breakdown
     const fare: FareBreakdownDto = {
       base: this.money(base),
-      timeComponent: this.money(timeComponent),
       distanceComponent: this.money(distanceComponent),
       surchargeMultiplier: multiplier.toString(),
       subtotal: this.money(subtotal),

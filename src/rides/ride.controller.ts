@@ -1,3 +1,4 @@
+ 
 import { Body, Controller, ForbiddenException, Injectable, Post, Req, UseGuards } from "@nestjs/common";
 import { RideService } from "./ride.service";
 import { JwtAuthGuard } from "src/auth/guards/jwt-auth.guard";

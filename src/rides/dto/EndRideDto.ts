@@ -22,7 +22,7 @@ export class EndRideDto {
 
 export class FareBreakdownDto {
   base!: string;                // "3.00"
-  timeComponent!: string;       // perMinute * duration
+  //timeComponent!: string;       // perMinute * duration
   distanceComponent!: string;   // perKm * distance
   surchargeMultiplier!: string; // "1.20"
   subtotal!: string;            // before tax

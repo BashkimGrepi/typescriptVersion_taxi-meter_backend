@@ -224,9 +224,7 @@ async function main() {
       tenantId: t1.id,
       name: 'Default 2025',
       baseFare: '5.00',
-      perMinute: '0.7500',
       perKm: '1.1000',
-      validFrom: new Date(now.getFullYear(), 0, 1),
       isActive: true,
     },
   });
@@ -236,10 +234,7 @@ async function main() {
       tenantId: t1.id,
       name: 'Old 2024',
       baseFare: '4.50',
-      perMinute: '0.6500',
       perKm: '1.0000',
-      validFrom: new Date(now.getFullYear() - 1, 0, 1),
-      validTo: new Date(now.getFullYear() - 1, 11, 31),
       isActive: false,
     },
   });
@@ -249,9 +244,7 @@ async function main() {
       tenantId: t2.id,
       name: 'City 2025',
       baseFare: '4.75',
-      perMinute: '0.7000',
       perKm: '1.0500',
-      validFrom: new Date(now.getFullYear(), 0, 1),
       isActive: true,
     },
   });

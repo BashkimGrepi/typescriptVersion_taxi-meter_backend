@@ -13,6 +13,7 @@ import { TenantsModule } from './tenants/tenants.module';
 import { AdminModule } from './admin/admin.module';
 import { ConfigModule } from '@nestjs/config';
 import { ExportsModule } from './exports/exports.module';
+import { PricingPoliciesModule } from './pricings/pricing-policies.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ExportsModule } from './exports/exports.module';
     TenantsModule,
     AdminModule,
     ExportsModule,
+    PricingPoliciesModule
   ],
   controllers: [AppController],
   providers: [AppService],
