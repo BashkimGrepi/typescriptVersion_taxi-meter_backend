@@ -66,6 +66,7 @@ export class AdminDriverService {
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone,
+        email: data.email,
         status: 'INVITED', // Default status
       },
       select: {

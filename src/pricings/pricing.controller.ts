@@ -5,6 +5,8 @@ import ListPricingPoliciesDto, { CreatePricingPolicyDto, UpdatePricingPolicyDto 
 import { AdminOrManager, type AdminOrManagerInfo } from "src/decorators/admin-or-manager.decorator";
 import { Admin, type AdminInfo } from "src/decorators/admin.decorator";
 import { Driver, type DriverInfo } from "src/decorators/driver.decorator";
+import { AuthenticatedUser, type AuthenticatedUserInfo } from "src/decorators/authenticated-user-decorator";
+import { use } from "passport";
 
 
 
@@ -17,7 +19,7 @@ export class PricingController {
     
     //list all policies - Admin & Manager can see all policies
     @Get()
-    async listPolicies(@AdminOrManager() user: AdminOrManagerInfo, @Query() dto: ListPricingPoliciesDto) {
+    async listPolicies(@AuthenticatedUser() user: AuthenticatedUserInfo, @Query() dto: ListPricingPoliciesDto) {
         return this.pricingService.list(user.tenantId, dto);
     }
 
@@ -52,8 +54,9 @@ export class PricingController {
 
     // GET /pricing/active/driver - Drivers can see their current pricing
     @Get('active/driver')
-    async activeForDriver(@Driver() driver: DriverInfo) {
-        return this.pricingService.getActive(driver.tenantId);
+    async activeForDriver(@AuthenticatedUser() user: AuthenticatedUserInfo) {
+        return this.pricingService.getActive(user.tenantId);
     }
+
 
 }

@@ -191,6 +191,7 @@ async function main() {
       firstName: 'Anna',
       lastName: 'Kuljettaja',
       phone: '+358401234567',
+      email: 'driver.user@metrotaxi.test',
       status: 'ACTIVE',
     },
   });
@@ -202,6 +203,7 @@ async function main() {
       lastName: 'Meikäläinen',
       phone: '+358409876543',
       status: 'INVITED',
+      email: 'matti@example.test',
     },
   });
 
@@ -356,6 +358,7 @@ async function main() {
       lastName: 'Suhari',
       phone: '+358401112223',
       status: 'ACTIVE',
+      email: 'sari@example.test',
     },
   });
 

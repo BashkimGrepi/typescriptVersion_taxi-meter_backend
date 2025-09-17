@@ -204,6 +204,7 @@ export class AdminInvitationService {
           firstName,
           lastName,
           phone: phone || null,
+          email,
           status: 'INVITED'
         }
       });

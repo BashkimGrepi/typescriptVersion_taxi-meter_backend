@@ -6,13 +6,13 @@ import {
   UseGuards,
   ValidationPipe
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { DriverGuard } from '../auth/guards/driver.guard';
-import { DriverProfileService } from './driver-profile.service';
-import { Driver } from '../decorators/driver.decorator';
-import type { DriverInfo } from '../decorators/driver.decorator';
-import { UpdateDriverProfileDto } from './dto/update-driver-profile.dto';
-import { DriverProfileResponseDto } from './dto/driver-profile-response.dto';
+import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
+import { DriverGuard } from '../../../auth/guards/driver.guard';
+import { DriverProfileService } from '../services/driver-profile.service';
+import { Driver } from '../../../decorators/driver.decorator';
+import type { DriverInfo } from '../../../decorators/driver.decorator';
+import { UpdateDriverProfileDto } from '../../dto/update-driver-profile.dto';
+import { DriverProfileResponseDto } from '../../dto/driver-profile-response.dto';
 
 @Controller('/driver')
 @UseGuards(JwtAuthGuard, DriverGuard)

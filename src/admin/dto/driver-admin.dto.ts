@@ -22,6 +22,10 @@ export class CreateDriverDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @IsString()
+  @IsEmail()
+  email: string;
 }
 
 export class UpdateDriverDto {

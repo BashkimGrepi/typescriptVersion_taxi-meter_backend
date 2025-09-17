@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { UpdateDriverProfileDto } from './dto/update-driver-profile.dto';
-import { DriverProfileResponseDto } from './dto/driver-profile-response.dto';
-import { DriverInfo } from '../decorators/driver.decorator';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { UpdateDriverProfileDto } from '../../dto/update-driver-profile.dto';
+import { DriverProfileResponseDto } from '../../dto/driver-profile-response.dto';
+import { DriverInfo } from '../../../decorators/driver.decorator';
 
 @Injectable()
 export class DriverProfileService {

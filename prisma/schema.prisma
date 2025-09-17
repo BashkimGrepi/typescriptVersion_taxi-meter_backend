@@ -126,6 +126,7 @@ model DriverProfile {
   userId      String?      @unique // null until invitation accepted
   firstName   String
   lastName    String
+  email       String       
   phone       String?
   status      String       // INVITED, ACTIVE, INACTIVE
   rides       Ride[]

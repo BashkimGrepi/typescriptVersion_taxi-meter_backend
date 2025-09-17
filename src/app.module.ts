@@ -32,7 +32,8 @@ import { PricingPoliciesModule } from './pricings/pricing-policies.module';
     TenantsModule,
     AdminModule,
     ExportsModule,
-    PricingPoliciesModule
+    PricingPoliciesModule,
+    DriversModule,
   ],
   controllers: [AppController],
   providers: [AppService],

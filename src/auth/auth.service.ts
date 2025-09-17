@@ -128,12 +128,14 @@ export class AuthService {
     // Active driver profiles for this user
     const profiles = await this.prisma.driverProfile.findMany({
       where: { userId: user.id, status: 'ACTIVE' },
+      
       select: {
         id: true,
         tenantId: true,
         firstName: true,
         lastName: true,
         phone: true,
+        email: true,
         status: true,
         tenant: { select: { name: true } },
       },
@@ -201,6 +203,7 @@ export class AuthService {
         firstName: profile.firstName,
         lastName: profile.lastName,
         phone: profile.phone,
+        email: profile.email,
         status: profile.status,
         role: 'DRIVER',
         tenantId: profile.tenantId,
@@ -286,6 +289,7 @@ export class AuthService {
         firstName: true,
         lastName: true,
         phone: true,
+        email: true,
         status: true,
         tenant: { select: { name: true } },
         user: { select: { id: true, email: true } },
@@ -320,6 +324,7 @@ export class AuthService {
         firstName: profile.firstName,
         lastName: profile.lastName,
         phone: profile.phone,
+        email: profile.email,
         status: profile.status,
         role: 'DRIVER',
         tenantId: profile.tenantId,

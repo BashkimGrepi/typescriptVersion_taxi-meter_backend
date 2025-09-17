@@ -15,7 +15,7 @@ import { AdminProfileService } from './services/admin-profile.service';
 // Controllers
 import { AdminDriverController } from './controllers/admin-driver.controller';
 import { AdminInvitationController } from './controllers/admin-invitation.controller';
-import { AdminRideController } from './controllers/admin-ride.controller';
+
 import { AdminPaymentController } from './controllers/admin-payment.controller';
 import { AdminReportController } from './controllers/admin-report.controller';
 import { AdminProfileController } from './controllers/admin-profile.controller';
@@ -37,7 +37,6 @@ import { AdminProfileController } from './controllers/admin-profile.controller';
   controllers: [
     AdminDriverController,
     AdminInvitationController,
-    AdminRideController,
     AdminPaymentController,
     AdminReportController,
     AdminProfileController

@@ -1,5 +1,5 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Logger } from '@nestjs/common';
-import { DriverProfileService } from '../../drivers/driver-profile.service';
+import { DriverProfileService } from '../../drivers/profile/services/driver-profile.service';
 
 @Injectable()
 export class DriverGuard implements CanActivate {
