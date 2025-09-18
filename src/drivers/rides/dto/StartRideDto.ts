@@ -1,6 +1,10 @@
-import { RideStatus } from "@prisma/client";
+import { RideStatus } from '@prisma/client';
+import { IsEnum, IsUUID } from 'class-validator';
 
 export class StartRideDto {
-    rideStatus: RideStatus;
-    driverProfileId: string;
+  @IsEnum(RideStatus)
+  rideStatus: RideStatus;
+
+  @IsUUID('4') // version 4 UUID  
+  driverProfileId: string;
 }
