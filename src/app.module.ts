@@ -14,6 +14,8 @@ import { AdminModule } from './admin/admin.module';
 import { ConfigModule } from '@nestjs/config';
 import { ExportsModule } from './exports/exports.module';
 import { PricingPoliciesModule } from './pricings/pricing-policies.module';
+import { CacheModule } from '@nestjs/cache-manager';
+import * as redisStore from 'cache-manager-redis-store';
 
 @Module({
   imports: [
@@ -21,11 +23,18 @@ import { PricingPoliciesModule } from './pricings/pricing-policies.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
-    AuthModule, 
-    UsersModule, 
-    DriversModule, 
-    RidesModule, 
-    PrismaModule, 
+    CacheModule.register({
+      isGlobal: true,
+      store: redisStore,
+      host: 'localhost',
+      port: 6379,
+      ttl: 43200, // 12 hours in seconds
+    }),
+    AuthModule,
+    UsersModule,
+    DriversModule,
+    RidesModule,
+    PrismaModule,
     HealthModule,
     PaymentsModule,
     ReportsModule,
@@ -33,7 +42,6 @@ import { PricingPoliciesModule } from './pricings/pricing-policies.module';
     AdminModule,
     ExportsModule,
     PricingPoliciesModule,
-    DriversModule,
   ],
   controllers: [AppController],
   providers: [AppService],
