@@ -456,7 +456,7 @@ export class DriverRideService {
     const rideItems: RideHistoryItemDto[] = rides.map(ride => ({
       id: ride.id,
       startedAt: ride.startedAt.toISOString(),
-      endedAt: ride.endedAt?.toDateString() || "",
+      endedAt: ride.endedAt?.toISOString() || "",
       duration: ride.durationMin ? `${Math.round(Number(ride.durationMin))} min` : '',
       distance: ride.distanceKm ? `${Number(ride.distanceKm).toFixed(1)} km` : '',
       earnings: this.money(ride.fareTotal || 0),

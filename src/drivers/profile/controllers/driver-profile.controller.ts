@@ -6,16 +6,16 @@ import {
   UseGuards,
   ValidationPipe
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
-import { DriverGuard } from '../../../auth/guards/driver.guard';
+
 import { DriverProfileService } from '../services/driver-profile.service';
 import { Driver } from '../../../decorators/driver.decorator';
 import type { DriverInfo } from '../../../decorators/driver.decorator';
 import { UpdateDriverProfileDto } from '../../dto/update-driver-profile.dto';
 import { DriverProfileResponseDto } from '../../dto/driver-profile-response.dto';
+import { DriverV1Guard } from 'src/auth/guards/driver-v1.guard';
 
 @Controller('/driver')
-@UseGuards(JwtAuthGuard, DriverGuard)
+@UseGuards(DriverV1Guard)
 export class DriverProfileController {
   constructor(private driverProfileService: DriverProfileService) {}
 
