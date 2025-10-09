@@ -193,9 +193,10 @@ model Payment {
   currency          String          @default("EUR")
   status            PaymentStatus
   authorizedAt      DateTime?
-  capturedAt        DateTime?
+  capturedAt        DateTime?     // when termianl returns (sales response / callback)
   failureCode       String?
   externalPaymentId String? // e.g. pi_xxx or Viva transaction id, platform-observed stripe object ID
+  approvalCode      String? 
   receiptNumber     String? // for the simplified monthly payment pdf receipt
   invoiceNumber     String?
   numberPeriod      String? // '202508' -> null until assigned
@@ -207,6 +208,7 @@ model Payment {
   @@unique([tenantId, numberPeriod, receiptNumber])
   @@unique([tenantId, numberPeriod, invoiceNumber])
   @@index([tenantId, capturedAt])
+  @@index([tenantId, status, capturedAt])
 }
 
 model NumberSequence {

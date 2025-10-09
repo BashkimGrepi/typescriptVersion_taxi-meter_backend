@@ -7,7 +7,7 @@ import { DriversModule } from './drivers/drivers.module';
 import { RidesModule } from './rides/rides.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './modules/health/health.module';
-import { PaymentsModule } from './payments/payments.module';
+import { PaymentsModule } from './payments/payments-module';
 import { ReportsModule } from './reports/reports.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { AdminModule } from './admin/admin.module';

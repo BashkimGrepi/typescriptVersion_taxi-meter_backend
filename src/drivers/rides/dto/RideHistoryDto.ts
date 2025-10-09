@@ -1,4 +1,4 @@
-import { RideStatus } from "@prisma/client";
+import { PaymentStatus, RideStatus } from "@prisma/client";
 
 export interface RideHistoryResponseDto {
     rides: RideHistoryItemDto[];
@@ -23,6 +23,11 @@ export interface RideHistoryItemDto {
     distance: string;
     earnings: string;
     status: RideStatus;
+    payment: {
+        id: string;
+        status: PaymentStatus;
+    }
+
 }
 
 export interface RideHistoryRequestDto {

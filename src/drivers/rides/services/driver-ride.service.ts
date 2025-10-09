@@ -272,7 +272,7 @@ export class DriverRideService {
         amount: updated.fareTotal!,
         currency: 'EUR',
         status: PaymentStatus.PENDING,
-        authorizedAt: new Date(),
+        authorizedAt: null,
         capturedAt: null,
         failureCode: null,
         externalPaymentId: null
@@ -452,6 +452,14 @@ export class DriverRideService {
       })
     ]);
 
+
+    const paymentForRide = await this.prisma.payment.findMany({
+      where: {
+        rideId: { in: rides.map(r => r.id) },
+      },
+      select: { id: true, status: true, rideId: true }
+    })
+
     // format rides for flatlist
     const rideItems: RideHistoryItemDto[] = rides.map(ride => ({
       id: ride.id,
@@ -460,7 +468,11 @@ export class DriverRideService {
       duration: ride.durationMin ? `${Math.round(Number(ride.durationMin))} min` : '',
       distance: ride.distanceKm ? `${Number(ride.distanceKm).toFixed(1)} km` : '',
       earnings: this.money(ride.fareTotal || 0),
-      status: ride.status
+      status: ride.status,
+      payment: {
+        id: paymentForRide.find(p => p.rideId === ride.id)?.id || '',
+        status: paymentForRide.find(p => p.rideId === ride.id)?.status || 'PENDING',
+      }
     }));
 
     const totalPages = Math.ceil(totalCount / limit);
