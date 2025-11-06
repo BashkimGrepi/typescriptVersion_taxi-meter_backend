@@ -7,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 enum Role {
   ADMIN
   MANAGER
@@ -21,7 +20,6 @@ enum RideStatus {
   CANCELLED
 }
 
-
 enum PaymentProvider {
   STRIPE
   VIVA
@@ -33,6 +31,7 @@ enum PaymentStatus {
   PAID
   FAILED
   REFUNDED
+  SUBMITTED
 }
 
 enum PaymentMethod {
@@ -84,7 +83,7 @@ model User {
   status        String // ACTIVE, LOCKED, etc.
   memberships   Membership[]
   driverProfile DriverProfile?
-  invitations   Invitation[]   // invitations sent by this user
+  invitations   Invitation[] // invitations sent by this user
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -115,8 +114,8 @@ model Invitation {
   invitedByUserId String?
   driverProfileId String?
 
-  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  invitedByUser User?  @relation(fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedByUser User?          @relation(fields: [invitedByUserId], references: [id], onDelete: SetNull)
   driverProfile DriverProfile? @relation(fields: [driverProfileId], references: [id], onDelete: SetNull)
 }
 
@@ -126,9 +125,9 @@ model DriverProfile {
   userId      String?      @unique // null until invitation accepted
   firstName   String
   lastName    String
-  email       String       
+  email       String
   phone       String?
-  status      String       // INVITED, ACTIVE, INACTIVE
+  status      String // INVITED, ACTIVE, INACTIVE
   rides       Ride[]
   invitations Invitation[] // invitations for this driver profile
 
@@ -140,27 +139,28 @@ model DriverProfile {
 }
 
 model PricingPolicy {
-  id        String    @id @default(uuid())
+  id        String   @id @default(uuid())
   tenantId  String
   name      String
-  baseFare  Decimal   @db.Decimal(10, 2)
-  perKm     Decimal   @db.Decimal(10, 4)
-  isActive  Boolean   @default(false)
+  baseFare  Decimal  @db.Decimal(10, 2)
+  perKm     Decimal  @db.Decimal(10, 4)
+  perMin    Decimal  @default(0.000) @db.Decimal(10, 3)
+  isActive  Boolean  @default(false)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
   ride      Ride[]
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // note: 'single active policy per tenant' is enforced via postgresql
+  // partial unique index added in sql migration
 
   @@index([tenantId, isActive])
   @@index([tenantId, updatedAt])
- // note: 'single active policy per tenant' is enforced via postgresql
- // partial unique index added in sql migration
 }
 
 model Ride {
   id              String        @id @default(uuid())
-  tenantId        String        // Every ride must belong to a tenant
+  tenantId        String // Every ride must belong to a tenant
   driverProfileId String
   pricingPolicyId String?
   startedAt       DateTime
@@ -173,6 +173,8 @@ model Ride {
   status          RideStatus
   payment         Payment?
   links           PaymentLink[]
+
+  webhookEvents WebhookEvent[]
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   driverProfile DriverProfile  @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
@@ -193,10 +195,10 @@ model Payment {
   currency          String          @default("EUR")
   status            PaymentStatus
   authorizedAt      DateTime?
-  capturedAt        DateTime?     // when termianl returns (sales response / callback)
+  capturedAt        DateTime? // when termianl returns (sales response / callback)
   failureCode       String?
   externalPaymentId String? // e.g. pi_xxx or Viva transaction id, platform-observed stripe object ID
-  approvalCode      String? 
+  approvalCode      String?
   receiptNumber     String? // for the simplified monthly payment pdf receipt
   invoiceNumber     String?
   numberPeriod      String? // '202508' -> null until assigned
@@ -204,36 +206,39 @@ model Payment {
   ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@index([tenantId, status])
+  webhookEvents WebhookEvent[]
+
   @@unique([tenantId, numberPeriod, receiptNumber])
   @@unique([tenantId, numberPeriod, invoiceNumber])
+  @@index([tenantId, status])
   @@index([tenantId, capturedAt])
   @@index([tenantId, status, capturedAt])
+  @@index([externalPaymentId])
 }
 
 model NumberSequence {
-  id          String              @id @default(uuid())
-  tenantId    String
-  type        NumberSequenceType
-  period      String              // 'YYYYMM'
-  current     Int
-  createdAt   DateTime            @default(now())
+  id        String             @id @default(uuid())
+  tenantId  String
+  type      NumberSequenceType
+  period    String // 'YYYYMM'
+  current   Int
+  createdAt DateTime           @default(now())
 
   @@unique([tenantId, type, period])
 }
 
 model ExportArchive {
-  id              String              @id @default(uuid())
+  id              String            @id @default(uuid())
   tenantId        String
   period          String
   type            ExportArchiveType
-  createdAt       DateTime            @default(now())
+  createdAt       DateTime          @default(now())
   createdByUserId String
   pdfPath         String
   jsonPath        String
   sha256          String
   count           Int
-  totalAmount     Decimal             @db.Decimal(10, 2)
+  totalAmount     Decimal           @db.Decimal(10, 2)
 
   @@index([tenantId, period, type])
 }
@@ -273,30 +278,38 @@ model WebhookEvent {
   id           String          @id @default(uuid())
   provider     PaymentProvider
   eventType    String
-  externalId   String          @unique
+  externalId   String          @unique //viva transaction id
   receivedAt   DateTime        @default(now())
   payloadJson  Json
   processedAt  DateTime?
   attemptCount Int             @default(0)
+  paymentId    String?
+  rideId       String?
+  errorMessage  String?
+
+  ride    Ride?    @relation(fields: [rideId], references: [id], onDelete: SetNull)
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
 
   @@index([provider, eventType])
+  @@index([paymentId])
+  @@index([rideId])
+  @@index([receivedAt])
 }
 
-
 model OAuthState {
-  id        String   @id @default(uuid())
-  nonce     String   @unique
+  id        String          @id @default(uuid())
+  nonce     String          @unique
   tenantId  String
   userId    String
   provider  PaymentProvider // STRIPE or VIVA
-  createdAt DateTime  @default(now())
+  createdAt DateTime        @default(now())
   expiresAt DateTime
-  consumed  Boolean  @default(false) // Prevents replay attacks
-  
+  consumed  Boolean         @default(false) // Prevents replay attacks
+
   // Optional: Foreign key relations for data integrity
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   // Note: Can't relate to User directly since User.id is String but we might store different ID format
-  
+
   @@index([nonce])
   @@index([expiresAt])
   @@index([tenantId, provider])
