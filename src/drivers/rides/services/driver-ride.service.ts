@@ -361,6 +361,10 @@ export class DriverRideService extends TenantScopedService {
       paymentId: paymentRecord.id,
       paymentStatus: paymentRecord.status,
       externalPaymentId: paymentRecord.externalPaymentId!,
+      // NEW FIELDS for Viva Terminal integration
+      orderCode: updated.id,      // will be same as rideId
+      amount: this.money(updated.fareTotal!),         // will be same as fareTotal
+      currency: 'EUR',       // will be "EUR"
     };
 
     return res;

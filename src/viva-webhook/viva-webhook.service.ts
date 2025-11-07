@@ -1,6 +1,5 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { VivaWebhookPayload } from './viva-webhook.dto';
-import axios from 'axios';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PaymentStatus } from '@prisma/client';
 
@@ -85,11 +84,13 @@ export class VivaWebhookService {
       return { status: 'error', reason: 'merchant_id_mismatch' };
     }
 
-    // find the payment by orderCode (ride id)
+    // find the payment by orderCode (ride id) - handle race conditions
     const payment = await this.prisma.payment.findFirst({
       where: {
         rideId: OrderCode.toString(),
-        status: PaymentStatus.PENDING,
+        status: {
+          in: [PaymentStatus.PENDING, PaymentStatus.SUBMITTED], // Handle both states
+        },
       },
     });
     if (!payment) {
@@ -112,18 +113,17 @@ export class VivaWebhookService {
       return { status: 'ignored', reason: 'amount_mismatch' };
     }
 
-    // update payment to paid
+    // update payment to paid (safe transition from PENDING or SUBMITTED)
+    const previousStatus = payment.status;
     await this.prisma.payment.update({
       where: { id: payment.id },
       data: {
         status: PaymentStatus.PAID,
         externalPaymentId: TransactionId,
         capturedAt: new Date(),
-        
-          
-          
       },
     });
+
     // mark webhook as processed
     await this.prisma.webhookEvent.update({
       where: { id: webhookEvent.id },
@@ -139,9 +139,12 @@ export class VivaWebhookService {
       rideId: OrderCode,
       transactionId: TransactionId,
       amount: Amount,
+      previousStatus: previousStatus, // Track what status it came from
+      transition: `${previousStatus} → PAID`, // Clear transition logging
     });
   }
 
+  // Helper to mark webhook as failed with optional processed flag
   async markWebhookFailed(
     webhookId: string,
     errorMessage: string,

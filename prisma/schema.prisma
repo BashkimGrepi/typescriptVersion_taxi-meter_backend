@@ -198,6 +198,7 @@ model Payment {
   receiptNumber     String? // for the simplified monthly payment pdf receipt
   invoiceNumber     String?
   numberPeriod      String? // '202508' -> null until assigned
+  providerMetadata  Json?
 
   ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
