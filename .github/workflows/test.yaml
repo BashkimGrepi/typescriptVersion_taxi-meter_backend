@@ -12,5 +12,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Testing taxi-meter_backend..."
-      - run: echo "Another test command"
+      - run: ls -al
+      - uses: actions/checkout@v3
+      - run: ls -al
