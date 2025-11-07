@@ -54,6 +54,9 @@ export class CreatePricingPolicyDto {
 
   @Matches(MONEY_RE, { message: 'perKm must be a number with up to 2 decimals' })
   perKm!: string;    // "1.20" (EUR/km)
+  
+  @Matches(MONEY_RE, { message: 'perMin must be a number with up to 2 decimals' })
+  perMin!: string;   // "0.30" (EUR/min)
 
   @IsOptional()
   @IsBoolean()

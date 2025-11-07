@@ -1,11 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ExportDataService, ExportPaymentRow, VatRateBucket } from './export-data.service';
 import { NumberingService } from './numbering.service';
 import * as crypto from 'crypto';
+import { TenantScopedService } from 'src/common/services/tenant-scoped.service';
+import { REQUEST } from '@nestjs/core';
+import { request } from 'express';
 
 type BuildSnapshotArgs = {
-  tenantId: string;
   from: Date;
   to: Date;
   type: 'simplified';       // later: 'full'
@@ -22,16 +24,20 @@ type NumberingSummary = {
 };
 
 @Injectable()
-export class SnapshotService {
+export class SnapshotService extends TenantScopedService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly data: ExportDataService,
     private readonly numbering: NumberingService,
-  ) {}
+    @Inject(REQUEST) request: Express.Request
+  ) {
+    super(request);
+  }
 
   /** Build the archive JSON and a sha256 hash. */
   async buildSnapshot(args: BuildSnapshotArgs): Promise<{ snapshot: any; sha256: string }> {
-    const { tenantId, from, to, type, generatedBy, includeAnnex = false } = args;
+    const tenantId = this.getCurrentTenantId();
+    const { from, to, type, generatedBy, includeAnnex = false } = args;
 
     // 1) Resolve tenant identity (why: must print seller info on documents)
     const tenant = await this.prisma.tenant.findUnique({
@@ -54,7 +60,7 @@ export class SnapshotService {
     const vatId = getVatId(tenant?.settingsJson) ?? null;
 
     // 2) Assign numbers (idempotent) and capture the summary
-    const numberingRes = await this.numbering.assignSimplifiedReceiptNumbers(tenantId, from, to);
+    const numberingRes = await this.numbering.assignSimplifiedReceiptNumbers(from, to);
     const numberingSummary: NumberingSummary = {
       period: numberingRes.period,
       startingNumber: numberingRes.startingNumber,
@@ -65,7 +71,7 @@ export class SnapshotService {
 
     // 3) Load the export dataset (rows, summaries, exceptions) with VAT math
     const { rows, summaryByRate, summaryByRateAndMethod, exceptions } =
-      await this.data.loadPaymentsDataset(tenantId, from, to);
+      await this.data.loadPaymentsDataset(from, to);
 
     // 4) Canonical ordering to guarantee repeatable hash
     const sortedRows = this.sortPayments(rows);

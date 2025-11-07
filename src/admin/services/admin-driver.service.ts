@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { 
   CreateDriverDto, 
@@ -8,12 +8,21 @@ import {
   DriversPageResponse,
   DriverStatus 
 } from '../dto/driver-admin.dto';
+import { REQUEST } from '@nestjs/core';
+import { request } from 'express';
+import { TenantScopedService } from 'src/common/services/tenant-scoped.service';
 
 @Injectable()
-export class AdminDriverService {
-  constructor(private prisma: PrismaService) {}
+export class AdminDriverService extends TenantScopedService {
+  constructor(
+    @Inject(REQUEST) request: Express.Request,
+    @Inject(PrismaService) private prisma: PrismaService,
+  ) {
+    super(request);
+  }
 
-  async getDrivers(tenantId: string, query: DriversQueryDto): Promise<DriversPageResponse> {
+  async getDrivers(query: DriversQueryDto): Promise<DriversPageResponse> {
+    const tenantId = this.getCurrentTenantId();
     const { q, status, page = 1, pageSize = 25 } = query;
     
     const where = {
@@ -59,10 +68,14 @@ export class AdminDriverService {
     };
   }
 
-  async createDriver(tenantId: string, data: CreateDriverDto): Promise<DriverResponseDto> {
+  async createDriver(data: CreateDriverDto): Promise<DriverResponseDto> {
+    const tenantId = this.getCurrentTenantId();
+    const userId = this.getCurrentUserId();
+
     const driver = await this.prisma.driverProfile.create({
       data: {
         tenantId,
+        userId,
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone,
@@ -89,10 +102,11 @@ export class AdminDriverService {
   }
 
   async updateDriver(
-    tenantId: string, 
+   
     driverId: string, 
     data: UpdateDriverDto
   ): Promise<DriverResponseDto> {
+    const tenantId = this.getCurrentTenantId();
     // First check if driver exists and belongs to tenant
     const existingDriver = await this.prisma.driverProfile.findFirst({
       where: { id: driverId, tenantId },

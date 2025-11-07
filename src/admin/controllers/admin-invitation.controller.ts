@@ -77,10 +77,9 @@ export class AdminInvitationController {
   @ApiResponse({ status: 403, description: 'Forbidden - ADMIN or MANAGER role required' })
   async getInvitations(
     @Query(new ValidationPipe({ transform: true })) query: InvitationsQueryDto,
-    @Request() req
+
   ): Promise<InvitationsPageResponse> {
-    const tenantId = req.user.tenantId;
-    return this.adminInvitationService.getInvitations(tenantId, query);
+    return this.adminInvitationService.getInvitations(query);
   }
 
   @Get(':id')
@@ -113,10 +112,8 @@ export class AdminInvitationController {
   @ApiResponse({ status: 404, description: 'Invitation not found' })
   async getInvitationById(
     @Param('id') invitationId: string,
-    @Request() req
   ): Promise<InvitationResponseDto> {
-    const tenantId = req.user.tenantId;
-    return this.adminInvitationService.getInvitationById(tenantId, invitationId);
+    return this.adminInvitationService.getInvitationById(invitationId);
   }
 
   @Post()
@@ -149,9 +146,8 @@ export class AdminInvitationController {
     createInvitationDto: CreateInvitationDto,
     @Request() req
   ): Promise<InvitationResponseDto> {
-    const tenantId = req.user.tenantId;
     const invitedByUserId = req.user.userId;
-    return this.adminInvitationService.createInvitation(tenantId, invitedByUserId, createInvitationDto);
+    return this.adminInvitationService.createInvitation(invitedByUserId, createInvitationDto);
   }
 
   @Patch(':id/resend')
@@ -185,10 +181,8 @@ export class AdminInvitationController {
   @ApiResponse({ status: 400, description: 'Bad Request - Invitation already accepted' })
   async resendInvitation(
     @Param('id') invitationId: string,
-    @Request() req
   ): Promise<InvitationResponseDto> {
-    const tenantId = req.user.tenantId;
-    return this.adminInvitationService.resendInvitation(tenantId, invitationId);
+    return this.adminInvitationService.resendInvitation(invitationId);
   }
 
   @Delete(':id')
@@ -205,9 +199,7 @@ export class AdminInvitationController {
   @ApiResponse({ status: 400, description: 'Bad Request - Invitation already accepted' })
   async cancelInvitation(
     @Param('id') invitationId: string,
-    @Request() req
   ): Promise<void> {
-    const tenantId = req.user.tenantId;
-    await this.adminInvitationService.cancelInvitation(tenantId, invitationId);
+    await this.adminInvitationService.cancelInvitation(invitationId);
   }
 }

@@ -25,7 +25,6 @@ export class ExportsPreviewController {
 
     // Build snapshot (this will also assign numbers idempotently)
     const { snapshot, sha256 } = await this.snapshot.buildSnapshot({
-      tenantId,
       from, to,
       type: 'simplified',
       generatedBy: { userId: req.user.sub, email: req.user.email },

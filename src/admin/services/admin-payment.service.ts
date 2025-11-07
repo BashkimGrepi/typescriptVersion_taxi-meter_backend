@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { 
   CreatePaymentDto, 
@@ -9,12 +9,21 @@ import {
 } from '../dto/payment-admin.dto';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PaymentProvider, PaymentStatus } from '@prisma/client';
+import { TenantScopedService } from 'src/common/services/tenant-scoped.service';
+import { REQUEST } from '@nestjs/core';
+import { request } from 'express';
 
 @Injectable()
-export class AdminPaymentService {
-  constructor(private prisma: PrismaService) {}
+export class AdminPaymentService extends TenantScopedService {
+  constructor(
+    @Inject(PrismaService) private prisma: PrismaService,
+    @Inject(REQUEST) request: Express.Request,
+  ) {
+    super(request);
+  }
 
-  async getPayments(tenantId: string, query: PaymentsQueryDto): Promise<PaymentsPageResponse> {
+  async getPayments(query: PaymentsQueryDto): Promise<PaymentsPageResponse> {
+    const tenantId = this.getCurrentTenantId();
     const {
       from,
       to,
@@ -23,7 +32,7 @@ export class AdminPaymentService {
       minAmount,
       maxAmount,
       page = 1,
-      pageSize = 25
+      pageSize = 25,
     } = query;
 
     // Build filter conditions
@@ -77,25 +86,28 @@ export class AdminPaymentService {
               driverProfile: {
                 select: {
                   firstName: true,
-                  lastName: true
-                }
-              }
-            }
-          }
-        }
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
       }),
-      this.prisma.payment.count({ where })
+      this.prisma.payment.count({ where }),
     ]);
 
     // Transform to response format
-    const items: PaymentResponseDto[] = payments.map(payment => ({
+    const items: PaymentResponseDto[] = payments.map((payment) => ({
       id: payment.id,
       tenantId: payment.tenantId,
       rideId: payment.rideId,
       amount: payment.amount.toString(),
       paymentMethod: payment.provider, // Using provider as paymentMethod
       notes: payment.failureCode || undefined, // Using failureCode as notes fallback
-      createdAt: payment.authorizedAt?.toISOString() || payment.capturedAt?.toISOString() || new Date().toISOString()
+      createdAt:
+        payment.authorizedAt?.toISOString() ||
+        payment.capturedAt?.toISOString() ||
+        new Date().toISOString(),
     }));
 
     const totalPages = Math.ceil(totalCount / pageSize);
@@ -105,15 +117,16 @@ export class AdminPaymentService {
       total: totalCount,
       page,
       pageSize,
-      totalPages
+      totalPages,
     };
   }
 
-  async getPaymentById(tenantId: string, paymentId: string): Promise<PaymentResponseDto> {
+  async getPaymentById(paymentId: string): Promise<PaymentResponseDto> {
+    const tenantId = this.getCurrentTenantId();
     const payment = await this.prisma.payment.findFirst({
       where: {
         id: paymentId,
-        tenantId
+        tenantId,
       },
       include: {
         ride: {
@@ -121,12 +134,12 @@ export class AdminPaymentService {
             driverProfile: {
               select: {
                 firstName: true,
-                lastName: true
-              }
-            }
-          }
-        }
-      }
+                lastName: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!payment) {
@@ -140,19 +153,25 @@ export class AdminPaymentService {
       amount: payment.amount.toString(),
       paymentMethod: payment.provider,
       notes: payment.failureCode || undefined,
-      createdAt: payment.authorizedAt?.toISOString() || payment.capturedAt?.toISOString() || new Date().toISOString()
+      createdAt:
+        payment.authorizedAt?.toISOString() ||
+        payment.capturedAt?.toISOString() ||
+        new Date().toISOString(),
     };
   }
 
-  async createPayment(tenantId: string, createPaymentDto: CreatePaymentDto): Promise<PaymentResponseDto> {
+  async createPayment(
+    createPaymentDto: CreatePaymentDto,
+  ): Promise<PaymentResponseDto> {
+    const tenantId = this.getCurrentTenantId();
     const { rideId, amount, paymentMethod, notes } = createPaymentDto;
 
     // Verify the ride exists and belongs to the tenant
     const ride = await this.prisma.ride.findFirst({
       where: {
         id: rideId,
-        tenantId
-      }
+        tenantId,
+      },
     });
 
     if (!ride) {
@@ -163,16 +182,19 @@ export class AdminPaymentService {
     const existingPayment = await this.prisma.payment.findFirst({
       where: {
         rideId,
-        tenantId
-      }
+        tenantId,
+      },
     });
 
     if (existingPayment) {
-      throw new BadRequestException(`Payment already exists for ride ${rideId}`);
+      throw new BadRequestException(
+        `Payment already exists for ride ${rideId}`,
+      );
     }
 
     // Map paymentMethod to provider enum
-    const provider = paymentMethod === 'card' ? PaymentProvider.STRIPE : PaymentProvider.VIVA;
+    const provider =
+      paymentMethod === 'card' ? PaymentProvider.STRIPE : PaymentProvider.VIVA;
 
     // Create the payment
     const payment = await this.prisma.payment.create({
@@ -185,8 +207,8 @@ export class AdminPaymentService {
         status: PaymentStatus.PAID,
         authorizedAt: new Date(),
         capturedAt: new Date(),
-        failureCode: notes || null
-      }
+        failureCode: notes || null,
+      },
     });
 
     return {
@@ -196,21 +218,22 @@ export class AdminPaymentService {
       amount: payment.amount.toString(),
       paymentMethod: payment.provider,
       notes: payment.failureCode || undefined,
-      createdAt: payment.authorizedAt?.toISOString() || new Date().toISOString()
+      createdAt:
+        payment.authorizedAt?.toISOString() || new Date().toISOString(),
     };
   }
 
   async updatePayment(
-    tenantId: string, 
-    paymentId: string, 
-    updatePaymentDto: UpdatePaymentDto
+    paymentId: string,
+    updatePaymentDto: UpdatePaymentDto,
   ): Promise<PaymentResponseDto> {
+    const tenantId = this.getCurrentTenantId();
     // Check if payment exists and belongs to tenant
     const existingPayment = await this.prisma.payment.findFirst({
       where: {
         id: paymentId,
-        tenantId
-      }
+        tenantId,
+      },
     });
 
     if (!existingPayment) {
@@ -219,15 +242,18 @@ export class AdminPaymentService {
 
     // Build update data
     const updateData: any = {};
-    
+
     if (updatePaymentDto.amount !== undefined) {
       updateData.amount = new Decimal(updatePaymentDto.amount);
     }
-    
+
     if (updatePaymentDto.paymentMethod !== undefined) {
-      updateData.provider = updatePaymentDto.paymentMethod === 'card' ? PaymentProvider.STRIPE : PaymentProvider.VIVA;
+      updateData.provider =
+        updatePaymentDto.paymentMethod === 'card'
+          ? PaymentProvider.STRIPE
+          : PaymentProvider.VIVA;
     }
-    
+
     if (updatePaymentDto.notes !== undefined) {
       updateData.failureCode = updatePaymentDto.notes;
     }
@@ -235,7 +261,7 @@ export class AdminPaymentService {
     // Update the payment
     const payment = await this.prisma.payment.update({
       where: { id: paymentId },
-      data: updateData
+      data: updateData,
     });
 
     return {
@@ -245,17 +271,22 @@ export class AdminPaymentService {
       amount: payment.amount.toString(),
       paymentMethod: payment.provider,
       notes: payment.failureCode || undefined,
-      createdAt: payment.authorizedAt?.toISOString() || payment.capturedAt?.toISOString() || new Date().toISOString()
+      createdAt:
+        payment.authorizedAt?.toISOString() ||
+        payment.capturedAt?.toISOString() ||
+        new Date().toISOString(),
     };
   }
 
-  async deletePayment(tenantId: string, paymentId: string): Promise<void> {
+  async deletePayment(paymentId: string): Promise<void> {
+    const tenantId = this.getCurrentTenantId();
+
     // Check if payment exists and belongs to tenant
     const existingPayment = await this.prisma.payment.findFirst({
       where: {
         id: paymentId,
-        tenantId
-      }
+        tenantId,
+      },
     });
 
     if (!existingPayment) {
@@ -264,11 +295,12 @@ export class AdminPaymentService {
 
     // Delete the payment
     await this.prisma.payment.delete({
-      where: { id: paymentId }
+      where: { id: paymentId },
     });
   }
 
-  async getPaymentsSummary(tenantId: string, from?: string, to?: string) {
+  async getPaymentsSummary(from?: string, to?: string) {
+    const tenantId = this.getCurrentTenantId();
     const where: any = { tenantId };
 
     // Date range filter based on ride relationship
@@ -279,37 +311,33 @@ export class AdminPaymentService {
       if (to) where.ride.startedAt.lte = new Date(to);
     }
 
-    const [
-      totalPayments,
-      totalAmount,
-      providerStats
-    ] = await Promise.all([
+    const [totalPayments, totalAmount, providerStats] = await Promise.all([
       // Total payment count
       this.prisma.payment.count({ where }),
-      
+
       // Total amount sum
       this.prisma.payment.aggregate({
         where,
-        _sum: { amount: true }
+        _sum: { amount: true },
       }),
-      
+
       // Provider breakdown (instead of paymentMethod since that field doesn't exist)
       this.prisma.payment.groupBy({
         where,
         by: ['provider'],
         _count: { _all: true },
-        _sum: { amount: true }
-      })
+        _sum: { amount: true },
+      }),
     ]);
 
     return {
       totalPayments,
       totalAmount: totalAmount._sum.amount?.toString() || '0',
-      paymentMethods: providerStats.map(stat => ({
+      paymentMethods: providerStats.map((stat) => ({
         method: stat.provider,
         count: stat._count?._all || 0,
-        totalAmount: stat._sum?.amount?.toString() || '0'
-      }))
+        totalAmount: stat._sum?.amount?.toString() || '0',
+      })),
     };
   }
 }

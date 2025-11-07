@@ -43,6 +43,8 @@ export class PaymentsService {
     };
   }
 
+  
+
   async validatePaymentAccess(
     paymentId: string,
     user: JwtValidationResult,

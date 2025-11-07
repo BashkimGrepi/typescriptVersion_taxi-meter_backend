@@ -1,5 +1,7 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
 import { Prisma, PrismaClient, PaymentStatus } from '@prisma/client';
+import { TenantScopedService } from 'src/common/services/tenant-scoped.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 type NumberingResult = {
@@ -14,8 +16,13 @@ type NumberingResult = {
 };
 
 @Injectable()
-export class NumberingService {
-  constructor(private readonly prisma: PrismaService) {}
+export class NumberingService extends TenantScopedService{
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(REQUEST) request: Express.Request
+  ) {
+    super(request);
+  }
 
   /** Helper: format a Date to 'YYYYMM' */
   private yyyymm(d: Date): string {
@@ -48,10 +55,10 @@ export class NumberingService {
    * - We run a single DB transaction so concurrent exports can’t collide.
    */
   async assignSimplifiedReceiptNumbers(
-    tenantId: string,
     from: Date,
     to: Date,
   ): Promise<NumberingResult> {
+    const tenantId = this.getCurrentTenantId();
     const period = this.assertSingleMonth(from, to);
 
     // 1) Collect candidate payments: PAID in window, tenant-scoped.

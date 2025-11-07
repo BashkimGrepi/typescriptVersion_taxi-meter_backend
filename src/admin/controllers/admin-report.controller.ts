@@ -48,10 +48,8 @@ export class AdminReportController {
   @ApiResponse({ status: 403, description: 'Forbidden - ADMIN or MANAGER role required' })
   async getRevenueReport(
     @Query(new ValidationPipe({ transform: true })) query: ReportsQueryDto,
-    @Request() req
   ): Promise<RevenueReportResponse> {
-    const tenantId = req.user.tenantId;
-    return this.adminReportService.getRevenueReport(tenantId, query);
+    return this.adminReportService.getRevenueReport(query);
   }
 
   @Get('driver-performance')
@@ -69,11 +67,9 @@ export class AdminReportController {
   @ApiResponse({ status: 401, description: 'Unauthorized - Invalid JWT token' })
   @ApiResponse({ status: 403, description: 'Forbidden - ADMIN or MANAGER role required' })
   async getDriverPerformanceReport(
-    @Query(new ValidationPipe({ transform: true })) query: ReportsQueryDto,
-    @Request() req
+    @Query(new ValidationPipe({ transform: true })) query: ReportsQueryDto
   ): Promise<DriverPerformanceResponse> {
-    const tenantId = req.user.tenantId;
-    return this.adminReportService.getDriverPerformanceReport(tenantId, query);
+    return this.adminReportService.getDriverPerformanceReport(query);
   }
 
   @Get('payment-methods')
@@ -94,8 +90,7 @@ export class AdminReportController {
     @Query(new ValidationPipe({ transform: true })) query: ReportsQueryDto,
     @Request() req
   ): Promise<PaymentMethodReportResponse> {
-    const tenantId = req.user.tenantId;
-    return this.adminReportService.getPaymentMethodReport(tenantId, query);
+    return this.adminReportService.getPaymentMethodReport(query);
   }
 
   @Get('summary')
@@ -136,13 +131,12 @@ export class AdminReportController {
     @Query(new ValidationPipe({ transform: true })) query: ReportsQueryDto,
     @Request() req
   ) {
-    const tenantId = req.user.tenantId;
     
     // Get all report data in parallel
     const [revenueReport, driverReport, paymentReport] = await Promise.all([
-      this.adminReportService.getRevenueReport(tenantId, query),
-      this.adminReportService.getDriverPerformanceReport(tenantId, query),
-      this.adminReportService.getPaymentMethodReport(tenantId, query)
+      this.adminReportService.getRevenueReport(query),
+      this.adminReportService.getDriverPerformanceReport(query),
+      this.adminReportService.getPaymentMethodReport(query)
     ]);
 
     // Calculate completion rate and other KPIs
@@ -151,8 +145,8 @@ export class AdminReportController {
     const toDate = to ? new Date(to) : new Date();
 
     const totalRidesIncludingCancelled = await this.prisma.ride.count({
+
       where: {
-        tenantId,
         startedAt: { gte: fromDate, lte: toDate }
       }
     });

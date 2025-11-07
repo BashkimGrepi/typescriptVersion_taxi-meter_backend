@@ -21,6 +21,13 @@ export class CreateInvitationDto {
   role: 'DRIVER' | 'MANAGER';
 
   @ApiProperty({
+    description: 'User ID to associate with the invitation',
+    example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
+  })
+  @IsString()
+  userId: string;
+
+  @ApiProperty({
     description: 'First name for driver profile (required for DRIVER role)',
     example: 'John',
     required: false

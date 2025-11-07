@@ -72,10 +72,8 @@ export class AdminDriverController {
   @ApiResponse({ status: 403, description: 'Forbidden - ADMIN or MANAGER role required' })
   async getDrivers(
     @Query(new ValidationPipe({ transform: true })) query: DriversQueryDto,
-    @Request() req
   ): Promise<DriversPageResponse> {
-    const tenantId = req.user.tenantId;
-    return this.adminDriverService.getDrivers(tenantId, query);
+    return this.adminDriverService.getDrivers(query);
   }
 
   @Post()
@@ -106,10 +104,8 @@ export class AdminDriverController {
   async createDriver(
     @Body(new ValidationPipe({ transform: true, whitelist: true })) 
     createDriverDto: CreateDriverDto,
-    @Request() req
   ): Promise<DriverResponseDto> {
-    const tenantId = req.user.tenantId;
-    return this.adminDriverService.createDriver(tenantId, createDriverDto);
+    return this.adminDriverService.createDriver(createDriverDto);
   }
 
   @Patch(':id')
@@ -143,9 +139,7 @@ export class AdminDriverController {
     @Param('id') driverId: string,
     @Body(new ValidationPipe({ transform: true, whitelist: true })) 
     updateDriverDto: UpdateDriverDto,
-    @Request() req
   ): Promise<DriverResponseDto> {
-    const tenantId = req.user.tenantId;
-    return this.adminDriverService.updateDriver(tenantId, driverId, updateDriverDto);
+    return this.adminDriverService.updateDriver(driverId, updateDriverDto);
   }
 }

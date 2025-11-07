@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Get,
   Header,
+  Inject,
   Query,
   Req,
   Res,
@@ -16,6 +17,9 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { TenantScopedService } from 'src/common/services/tenant-scoped.service';
+import { REQUEST } from '@nestjs/core';
+import { request } from 'express';
 
 function safeTs(d = new Date()) {
   // compact timestamp for filenames, e.g. 2025-08-26T13:42:10Z -> 20250826-134210
@@ -25,12 +29,15 @@ function safeTs(d = new Date()) {
 
 @UseGuards(JwtAuthGuard)
 @Controller('admin/exports')
-export class ExportsController {
+export class ExportsController extends TenantScopedService{
   constructor(
     private readonly snapshot: SnapshotService,
     private readonly pdf: PdfService,
     private readonly prisma: PrismaService,
-  ) {}
+    @Inject(REQUEST) request: Express.Request
+  ) {
+    super(request);
+  }
 
   @Get('payments.pdf')
   @Header('Content-Type', 'application/pdf')
@@ -43,11 +50,11 @@ export class ExportsController {
     @Query('annex') annex = '0',
   ) {
     // ---- 0) Auth & params ---------------------------------------------------
-    const role = req.user?.role;
+    const role = this.getCurrentUserRole();
     if (!['ADMIN', 'MANAGER'].includes(role)) {
       throw new ForbiddenException('Admins/Managers only');
     }
-    const tenantId = req.user?.tenantId;
+    const tenantId = this.getCurrentTenantId();
     if (!tenantId) throw new ForbiddenException('Missing tenant context');
 
     if (type !== 'simplified') {
@@ -62,7 +69,6 @@ export class ExportsController {
 
     // ---- 1) Build snapshot (idempotently assigns receipt numbers) -----------
     const { snapshot, sha256 } = await this.snapshot.buildSnapshot({
-      tenantId,
       from,
       to,
       type: 'simplified',

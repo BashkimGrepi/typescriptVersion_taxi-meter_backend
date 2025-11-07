@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { PrismaClient, Role, RideStatus, PaymentProvider, PaymentStatus, NumberSequenceType, ExportArchiveType } from '@prisma/client';
+import { PrismaClient, Role, RideStatus, PaymentProvider, PaymentStatus, NumberSequenceType, ExportArchiveType, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -138,7 +138,6 @@ async function main() {
   await prisma.pricingPolicy.deleteMany();
   await prisma.driverProfile.deleteMany();
   await prisma.invitation.deleteMany();
-  await prisma.membership.deleteMany();
   await prisma.providerAccount.deleteMany();
   await prisma.user.deleteMany();
   await prisma.tenant.deleteMany();
@@ -166,23 +165,17 @@ async function main() {
 
   const [admin, manager, userDriver] = await Promise.all([
     prisma.user.create({
-      data: { email: 'admin@metrotaxi.test', username: 'admin', passwordHash, status: 'ACTIVE' },
+      data: { email: 'admin@metrotaxi.test', passwordHash, status: 'ACTIVE', role: Role.ADMIN, tenantId: t1.id },
     }),
     prisma.user.create({
-      data: { email: 'manager@metrotaxi.test', username: 'manager', passwordHash, status: 'ACTIVE' },
+      data: { email: 'manager@metrotaxi.test', passwordHash, status: 'ACTIVE', role: Role.MANAGER, tenantId: t1.id },
     }),
     prisma.user.create({
-      data: { email: 'driver.user@metrotaxi.test', username: 'driverUser', passwordHash, status: 'ACTIVE' },
+      data: { email: 'driver.user@metrotaxi.test', passwordHash, role: Role.DRIVER, status: UserStatus.ACTIVE, tenantId: t1.id },
     }),
   ]);
 
-  // Memberships (tenant-scoped roles)
-  await Promise.all([
-    prisma.membership.create({ data: { userId: admin.id, tenantId: t1.id, role: Role.ADMIN } }),
-    prisma.membership.create({ data: { userId: manager.id, tenantId: t1.id, role: Role.MANAGER } }),
-    prisma.membership.create({ data: { userId: admin.id, tenantId: t2.id, role: Role.ADMIN } }),
-  ]);
-
+ 
   // Driver profiles (one linked to a user, one invited-only)
   const driverA = await prisma.driverProfile.create({
     data: {
@@ -196,29 +189,9 @@ async function main() {
     },
   });
 
-  const driverB = await prisma.driverProfile.create({
-    data: {
-      tenantId: t1.id,
-      firstName: 'Matti',
-      lastName: 'Meikäläinen',
-      phone: '+358409876543',
-      status: 'INVITED',
-      email: 'matti@example.test',
-    },
-  });
+  
 
-  // Invitation for driverB
-  await prisma.invitation.create({
-    data: {
-      tenantId: t1.id,
-      email: 'matti@example.test',
-      role: Role.DRIVER,
-      token: 'INVITE-TOKEN-123',
-      expiresAt: addMinutes(now, 60 * 24 * 7),
-      invitedByUserId: admin.id,
-      driverProfileId: driverB.id,
-    },
-  });
+ 
 
   // Pricing policies (enforce single active per tenant)
   const pricing1 = await prisma.pricingPolicy.create({
@@ -237,6 +210,7 @@ async function main() {
       name: 'Old 2024',
       baseFare: '4.50',
       perKm: '1.0000',
+      perMin: '0.60',
       isActive: false,
     },
   });
@@ -247,6 +221,7 @@ async function main() {
       name: 'City 2025',
       baseFare: '4.75',
       perKm: '1.0500',
+      perMin: '0.70',
       isActive: true,
     },
   });
@@ -329,11 +304,11 @@ async function main() {
   // Draft
   await createRideWithOptionalPayment({
     tenantId: t1.id,
-    driverProfileId: driverB.id,
+    driverProfileId: driverA.id,
     pricingPolicyId: pricing1.id,
     startedAt: addMinutes(now, -120),
-    durationMin: 0,
-    distanceKm: 0,
+    durationMin: 14,
+    distanceKm: 16.6,
     status: RideStatus.DRAFT,
   });
 
@@ -350,21 +325,11 @@ async function main() {
     provider: PaymentProvider.STRIPE,
   });
 
-  // Rides for T2
-  const driverC = await prisma.driverProfile.create({
-    data: {
-      tenantId: t2.id,
-      firstName: 'Sari',
-      lastName: 'Suhari',
-      phone: '+358401112223',
-      status: 'ACTIVE',
-      email: 'sari@example.test',
-    },
-  });
+ 
 
   await createRideWithOptionalPayment({
     tenantId: t2.id,
-    driverProfileId: driverC.id,
+    driverProfileId: driverA.id,
     pricingPolicyId: pricing2.id,
     startedAt: addMinutes(thisMonthStart, 240),
     durationMin: 30,
@@ -376,7 +341,7 @@ async function main() {
 
   await createRideWithOptionalPayment({
     tenantId: t2.id,
-    driverProfileId: driverC.id,
+    driverProfileId: driverA.id,
     pricingPolicyId: pricing2.id,
     startedAt: addMinutes(now, -180),
     durationMin: 15,

@@ -1,22 +1,32 @@
-
-import { PrismaService } from "src/prisma/prisma.service";
-import ListPricingPoliciesDto, { CreatePricingPolicyDto, UpdatePricingPolicyDto } from "./dto/pricing-policies.dto";
-import { Prisma } from "@prisma/client";
-import { NotFoundError } from "rxjs";
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { basename } from "path";
-
+import { PrismaService } from 'src/prisma/prisma.service';
+import ListPricingPoliciesDto, {
+  CreatePricingPolicyDto,
+  UpdatePricingPolicyDto,
+} from './dto/pricing-policies.dto';
+import { Prisma } from '@prisma/client';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { TenantScopedService } from 'src/common/services/tenant-scoped.service';
 
 @Injectable()
-export class PricingService {
-    constructor(private readonly prisma: PrismaService) {}
+export class PricingService extends TenantScopedService {
+  constructor(
+    @Inject(REQUEST) request: Express.Request,
+    @Inject(PrismaService) private prisma: PrismaService,
+  ) {
+    super(request);
+  }
 
-     /**
+  /**
    * List pricing policies for the current tenant.
    * We pass tenantId explicitly to guarantee multi-tenant isolation at the data layer,
    * not just in controllers/guards.
    */
-  async list(tenantId: string, dto: ListPricingPoliciesDto) {
+
+  
+
+  async list(dto: ListPricingPoliciesDto) {
+    const tenantId = this.getCurrentTenantId();
     // Build WHERE dynamically but safely
     const where: Prisma.PricingPolicyWhereInput = { tenantId };
 
@@ -42,7 +52,9 @@ export class PricingService {
      * In Postgres, this gives you a stable snapshot within the same transaction.
      * Not strictly required, but avoids odd race conditions during pagination UIs.
      */
+    
     const [items, total, activeCount] = await this.prisma.$transaction([
+      
       this.prisma.pricingPolicy.findMany({
         where,
         orderBy,
@@ -55,6 +67,7 @@ export class PricingService {
           // baseFare/perKm are Decimal in Prisma; we return them as strings to avoid FP rounding bugs
           baseFare: true,
           perKm: true,
+          perMin: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -68,63 +81,71 @@ export class PricingService {
       ...p,
       baseFare: p.baseFare.toString(),
       perKm: p.perKm.toString(),
+      perMin: p.perMin.toString(),
     }));
 
     return {
       items: serialized,
       total,
-      activeCount,                 // helps UI warn if none is active
+      activeCount, // helps UI warn if none is active
       page: Math.floor(dto.offset / dto.limit) + 1,
       pageSize: dto.limit,
     };
   }
 
-    // ------------- CREATE -------------
-    async create(tenantId: string, dto: CreatePricingPolicyDto) {
-        // if tenant has no active policy yet, we auto-activate the first one.
-        const activeCount = await this.prisma.pricingPolicy.count({
-            where: { tenantId, isActive: true },
+  // ------------- CREATE -------------
+  async create(dto: CreatePricingPolicyDto) {
+    const tenantId = this.getCurrentTenantId();
+
+    // if tenant has no active policy yet, we auto-activate the first one.
+    const activeCount = await this.prisma.pricingPolicy.count({
+      where: { tenantId, isActive: true },
+    });
+    const shouldActivate = dto.isActive === true || activeCount === 0;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (shouldActivate) {
+        //deactivate all others first for the tenant (idempodent)
+        await tx.pricingPolicy.updateMany({
+          where: { tenantId, isActive: true },
+          data: { isActive: false },
         });
-        const shouldActivate = dto.isActive === true || activeCount === 0;;
+      }
 
-        return this.prisma.$transaction(async (tx) => {
-            if (shouldActivate) {
-                //deactivate all others first for the tenant (idempodent)
-                await tx.pricingPolicy.updateMany({
-                    where: { tenantId, isActive: true },
-                    data: { isActive: false },
-                });
-            }
+      const created = await tx.pricingPolicy.create({
+        data: {
+          tenantId,
+          name: dto.name,
+          baseFare: dto.baseFare,
+          perKm: dto.perKm,
+          perMin: dto.perMin,
+          isActive: shouldActivate,
+        },
+        select: {
+          id: true,
+          name: true,
+          isActive: true,
+          baseFare: true,
+          perKm: true,
+          perMin: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
 
-            const created = await tx.pricingPolicy.create({
-                data: {
-                    tenantId,
-                    name: dto.name,
-                    baseFare: dto.baseFare,
-                    perKm: dto.perKm,
-                    isActive: shouldActivate,
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    isActive: true,
-                    baseFare: true,
-                    perKm: true,
-                    createdAt: true,
-                    updatedAt: true,
-                },
-            });
-
-            return {
-                ...created,
-                baseFare: created.baseFare.toString(),
-                perKm: created.perKm.toString(),
-            };
-        });
-    }
+      return {
+        ...created,
+        baseFare: created.baseFare.toString(),
+        perKm: created.perKm.toString(),
+        perMin: created.perMin.toString(),
+      };
+    });
+  }
 
   // ------------ UPDATE (no activation) -------------
-  async update(tenantId: string, id: string, dto: UpdatePricingPolicyDto) {
+  async update(id: string, dto: UpdatePricingPolicyDto) {
+    const tenantId = this.getCurrentTenantId();
+
     // verify ownership to prevents cross-tenant updates
     const existing = await this.prisma.pricingPolicy.findFirst({
       where: { id, tenantId },
@@ -138,6 +159,7 @@ export class PricingService {
         name: dto.name ?? undefined,
         baseFare: dto.baseFare ?? undefined,
         perKm: dto.perKm ?? undefined,
+        perMin: dto.perMin ?? undefined,
         // isActive not included
       },
       select: {
@@ -146,6 +168,7 @@ export class PricingService {
         isActive: true,
         baseFare: true,
         perKm: true,
+        perMin: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -155,11 +178,14 @@ export class PricingService {
       ...updated,
       baseFare: updated.baseFare.toString(),
       perKm: updated.perKm.toString(),
+      perMin: updated.perMin.toString(),
     };
   }
 
   // ------------ ACTIVATE (exactly one active per tenant) -------------
-  async activate(tenantId: string, id: string) {
+  async activate(id: string) {
+    const tenantId = this.getCurrentTenantId();
+
     // ensure the target policy belongs to the tenant
     const target = await this.prisma.pricingPolicy.findFirst({
       where: { id, tenantId },
@@ -182,8 +208,9 @@ export class PricingService {
     ]);
     return { id, isActive: true };
   }
-    // (optional helper) get currently active for a tenant
-  async getActive(tenantId: string) {
+  // (optional helper) get currently active for a tenant
+  async getActive() {
+    const tenantId = this.getCurrentTenantId();
     const active = await this.prisma.pricingPolicy.findFirst({
       where: { tenantId, isActive: true },
       orderBy: { updatedAt: 'desc' },
@@ -193,6 +220,7 @@ export class PricingService {
       ...active,
       baseFare: active.baseFare.toString(),
       perKm: active.perKm.toString(),
+      perMin: active.perMin.toString(),
     };
   }
 }

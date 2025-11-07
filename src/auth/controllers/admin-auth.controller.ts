@@ -5,7 +5,6 @@ import { RegisterDto } from '../dto/admin/register.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from 'src/decorators/public.decorator';
 import { UserResponseDto } from '../dto/common/user-response.dto';
-import { SelectTenantDto } from '../dto/admin/select-tenant.dto';
 
 @Controller('auth/admin')
 export class AdminAuthController {
@@ -28,16 +27,5 @@ export class AdminAuthController {
     return new UserResponseDto(req.user);
   }
 
-  @Public()
-  @Post('select-tenant')
-  async selectTenant(@Body() dto: { loginTicket?: string; tenantId: string }, @Req() req) {
-    const fromHeader = req.headers.authorization?.startsWith('Bearer ')
-      ? req.headers.authorization.slice(7)
-      : undefined;
-
-    return this.authService.selectTenant({
-      loginTicket: dto.loginTicket ?? fromHeader,
-      tenantId: dto.tenantId,
-    });
-  }
+ 
 }
