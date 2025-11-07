@@ -17,5 +17,6 @@ jobs:
       - run: ls -al
   deps:
     runs-on: ubuntu-latest
+    needs: [test] 
     steps:
       - run: echo "Here we are"
