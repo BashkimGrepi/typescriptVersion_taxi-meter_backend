@@ -15,3 +15,7 @@ jobs:
       - run: ls -al
       - uses: actions/checkout@v3
       - run: ls -al
+  deps:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Here we are"
