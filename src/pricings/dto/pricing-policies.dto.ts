@@ -4,7 +4,7 @@ import { IsBoolean, IsInt, IsOptional, Min, IsString, Max, IsIn, IsEmpty, IsNotE
 
 
 
-export default class ListPricingPoliciesDto {
+export default class  ListPricingPoliciesDto {
 
     @IsOptional()
     @IsBoolean()

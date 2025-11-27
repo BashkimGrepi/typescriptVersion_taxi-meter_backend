@@ -1,12 +1,20 @@
-import { IsOptional, IsString, IsEnum, IsEmail, IsInt, Min, Max } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsEmail,
+  IsInt,
+  Min,
+  Max,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum DriverStatus {
   INVITED = 'INVITED',
-  ACTIVE = 'ACTIVE', 
+  ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
-  ALL = 'ALL'
+  ALL = 'ALL',
 }
 
 export class CreateDriverDto {
@@ -21,7 +29,7 @@ export class CreateDriverDto {
   @ApiPropertyOptional({ example: '+358401234567' })
   @IsOptional()
   @IsString()
-  phone?: string;
+  phone: string;
 
   @IsString()
   @IsEmail()
@@ -44,6 +52,11 @@ export class UpdateDriverDto {
   @IsString()
   phone?: string;
 
+  @ApiPropertyOptional({ example: 'john@example.com' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
   @ApiPropertyOptional({ enum: ['INVITED', 'ACTIVE', 'INACTIVE'] })
   @IsOptional()
   @IsEnum(['INVITED', 'ACTIVE', 'INACTIVE'])
@@ -51,7 +64,9 @@ export class UpdateDriverDto {
 }
 
 export class DriversQueryDto {
-  @ApiPropertyOptional({ description: 'Search term for firstName, lastName, phone' })
+  @ApiPropertyOptional({
+    description: 'Search term for firstName, lastName, phone',
+  })
   @IsOptional()
   @IsString()
   q?: string;
@@ -82,8 +97,9 @@ export interface DriverResponseDto {
   tenantId: string;
   firstName: string;
   lastName: string;
-  phone?: string;
-  userId?: string;
+  email: string;
+  phone: string;
+  userId: string;
   status: string;
   createdAt: string;
 }

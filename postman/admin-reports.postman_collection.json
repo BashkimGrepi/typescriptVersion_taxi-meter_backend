@@ -1,0 +1,527 @@
+{
+  "info": {
+    "name": "Taxi Meter API - Admin Reports",
+    "description": "Complete API collection for testing admin reporting endpoints including revenue, driver performance, payment methods, and dashboard summary",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "taxi-meter-admin-reports"
+  },
+  "item": [
+    {
+      "name": "Admin Authentication",
+      "item": [
+        {
+          "name": "Admin Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Save JWT token for subsequent requests",
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('admin_token', response.access_token);",
+                  "    console.log('Admin token saved:', response.access_token);",
+                  "    ",
+                  "    // Also save user info for debugging",
+                  "    pm.collectionVariables.set('user_id', response.user.id);",
+                  "    pm.collectionVariables.set('tenant_id', response.user.tenantId);",
+                  "} else {",
+                  "    console.log('Login failed:', pm.response.text());",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@demo.com\",\n  \"password\": \"AdminPass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin Reports",
+      "item": [
+        {
+          "name": "Dashboard Summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Validate dashboard summary response",
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains required fields', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('totalRides');",
+                  "    pm.expect(response).to.have.property('totalRevenue');",
+                  "    pm.expect(response).to.have.property('activeDrivers');",
+                  "    pm.expect(response).to.have.property('completionRate');",
+                  "    pm.expect(response).to.have.property('paymentRate');",
+                  "});",
+                  "",
+                  "console.log('Dashboard Summary:', JSON.stringify(pm.response.json(), null, 2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/reports/summary?from={{start_date}}&to={{end_date}}&granularity=daily",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "reports", "summary"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{start_date}}",
+                  "description": "Start date (ISO string)"
+                },
+                {
+                  "key": "to",
+                  "value": "{{end_date}}",
+                  "description": "End date (ISO string)"
+                },
+                {
+                  "key": "granularity",
+                  "value": "daily",
+                  "description": "Report granularity: daily, weekly, monthly"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Revenue Report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Revenue report structure is valid', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('period');",
+                  "    pm.expect(response).to.have.property('data');",
+                  "    pm.expect(response).to.have.property('summary');",
+                  "    pm.expect(response.data).to.be.an('array');",
+                  "});",
+                  "",
+                  "console.log('Revenue Report:', JSON.stringify(pm.response.json(), null, 2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/reports/revenue?from={{start_date}}&to={{end_date}}&granularity=daily",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "reports", "revenue"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{start_date}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{end_date}}"
+                },
+                {
+                  "key": "granularity",
+                  "value": "daily"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Driver Performance Report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Driver performance report structure is valid', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('period');",
+                  "    pm.expect(response).to.have.property('drivers');",
+                  "    pm.expect(response).to.have.property('fleetSummary');",
+                  "    pm.expect(response.drivers).to.be.an('array');",
+                  "});",
+                  "",
+                  "console.log('Driver Performance Report:', JSON.stringify(pm.response.json(), null, 2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/reports/driver-performance?from={{start_date}}&to={{end_date}}&granularity=weekly",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "reports", "driver-performance"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{start_date}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{end_date}}"
+                },
+                {
+                  "key": "granularity",
+                  "value": "weekly"
+                },
+                {
+                  "key": "driverId",
+                  "value": "{{driver_id}}",
+                  "description": "Optional: Filter by specific driver ID",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Payment Methods Report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Payment methods report structure is valid', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('period');",
+                  "    pm.expect(response).to.have.property('paymentMethods');",
+                  "    pm.expect(response).to.have.property('summary');",
+                  "    pm.expect(response.paymentMethods).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Payment methods contain expected fields', function () {",
+                  "    const response = pm.response.json();",
+                  "    if (response.paymentMethods.length > 0) {",
+                  "        const method = response.paymentMethods[0];",
+                  "        pm.expect(method).to.have.property('paymentMethod');",
+                  "        pm.expect(method).to.have.property('paymentCount');",
+                  "        pm.expect(method).to.have.property('totalAmount');",
+                  "        pm.expect(method).to.have.property('percentage');",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Summary contains payment statistics', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.summary).to.have.property('totalPayments');",
+                  "    pm.expect(response.summary).to.have.property('totalAmount');",
+                  "    pm.expect(response.summary).to.have.property('avgPaymentAmount');",
+                  "    pm.expect(response.summary).to.have.property('paymentRate');",
+                  "});",
+                  "",
+                  "console.log('Payment Methods Report:', JSON.stringify(pm.response.json(), null, 2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/reports/payment-methods?from={{start_date}}&to={{end_date}}&granularity=monthly",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "reports", "payment-methods"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{start_date}}",
+                  "description": "Start date filter (ISO string)"
+                },
+                {
+                  "key": "to",
+                  "value": "{{end_date}}",
+                  "description": "End date filter (ISO string)"
+                },
+                {
+                  "key": "granularity",
+                  "value": "monthly",
+                  "description": "Report granularity: daily, weekly, monthly"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Report Variations",
+      "item": [
+        {
+          "name": "Last 7 Days Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/reports/summary?from={{seven_days_ago}}&to={{today}}&granularity=daily",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "reports", "summary"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{seven_days_ago}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{today}}"
+                },
+                {
+                  "key": "granularity",
+                  "value": "daily"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Monthly Payment Methods Breakdown",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/reports/payment-methods?from={{month_start}}&to={{month_end}}&granularity=monthly",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "reports", "payment-methods"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{month_start}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{month_end}}"
+                },
+                {
+                  "key": "granularity",
+                  "value": "monthly"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Specific Driver Performance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/reports/driver-performance?from={{start_date}}&to={{end_date}}&driverId={{specific_driver_id}}&granularity=daily",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "reports", "driver-performance"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{start_date}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{end_date}}"
+                },
+                {
+                  "key": "driverId",
+                  "value": "{{specific_driver_id}}",
+                  "description": "Filter by specific driver UUID"
+                },
+                {
+                  "key": "granularity",
+                  "value": "daily"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set dynamic date variables for testing",
+          "const now = new Date();",
+          "const today = now.toISOString();",
+          "const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();",
+          "const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();",
+          "",
+          "// Month boundaries",
+          "const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();",
+          "const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();",
+          "",
+          "// Set collection variables",
+          "pm.collectionVariables.set('today', today);",
+          "pm.collectionVariables.set('seven_days_ago', sevenDaysAgo);",
+          "pm.collectionVariables.set('thirty_days_ago', thirtyDaysAgo);",
+          "pm.collectionVariables.set('month_start', monthStart);",
+          "pm.collectionVariables.set('month_end', monthEnd);",
+          "",
+          "// Use thirty days ago as default start date",
+          "pm.collectionVariables.set('start_date', thirtyDaysAgo);",
+          "pm.collectionVariables.set('end_date', today);"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string",
+      "description": "Base URL for the Taxi Meter API"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string",
+      "description": "JWT token for admin authentication"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string",
+      "description": "Current admin user ID"
+    },
+    {
+      "key": "tenant_id",
+      "value": "",
+      "type": "string",
+      "description": "Current tenant ID"
+    },
+    {
+      "key": "start_date",
+      "value": "",
+      "type": "string",
+      "description": "Report start date (auto-generated)"
+    },
+    {
+      "key": "end_date",
+      "value": "",
+      "type": "string",
+      "description": "Report end date (auto-generated)"
+    },
+    {
+      "key": "today",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "seven_days_ago",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "thirty_days_ago",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "month_start",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "month_end",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "driver_id",
+      "value": "",
+      "type": "string",
+      "description": "Driver UUID for filtering (optional)"
+    },
+    {
+      "key": "specific_driver_id",
+      "value": "",
+      "type": "string",
+      "description": "Specific driver ID for performance reports"
+    }
+  ]
+}

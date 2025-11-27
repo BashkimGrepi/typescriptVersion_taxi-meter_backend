@@ -28,7 +28,11 @@ export class PaymentsController {
     return this.service.getPaymentById(paymentId);
   }
 
-  @Post(':id/confirm')
+
+
+
+  // Confirm payment with cash method ->> needs modification in the service
+  @Post(':id/confirm/cash')
   async confirmDriverPayment(
     @Param('id') paymentId: string,
     @Body() dto: payments.ConfirmPaymentDto,

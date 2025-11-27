@@ -279,6 +279,8 @@ export class DriverRideService {
       },
     });
 
+
+
     // 9) Build response with a friendly fare breakdown
     const fare: FareBreakdownDto = {
       base: this.money(base),
@@ -338,7 +340,11 @@ export class DriverRideService {
         startedAt: {
           gte: startOfDay,
           lte: endOfDay
+        },
+        payment: {
+          status: 'PAID'
         }
+        
       },
       _count: { id: true },
       _sum: { fareTotal: true, durationMin: true }

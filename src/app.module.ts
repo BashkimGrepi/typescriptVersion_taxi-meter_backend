@@ -16,6 +16,7 @@ import { ExportsModule } from './exports/exports.module';
 import { PricingPoliciesModule } from './pricings/pricing-policies.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import * as redisStore from 'cache-manager-redis-store';
+import { VivaWebhookModule } from './viva-webhook/viva-webhook.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import * as redisStore from 'cache-manager-redis-store';
     AdminModule,
     ExportsModule,
     PricingPoliciesModule,
+    VivaWebhookModule,
   ],
   controllers: [AppController],
   providers: [AppService],

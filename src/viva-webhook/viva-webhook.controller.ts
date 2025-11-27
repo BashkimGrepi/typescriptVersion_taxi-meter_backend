@@ -1,64 +1,74 @@
-import { Body, Controller, Get, Header, HttpStatus, Logger, Post, Res, UsePipes, ValidationPipe } from "@nestjs/common";
-import express from "express";
-import { VivaWebhookService } from "./viva-webhook.service";
-import { Public } from "src/decorators/public.decorator";
-import { VivaWebhookPayload } from "./viva-webhook.dto";
-import { error } from "console";
-import { stat } from "fs";
-
-
-
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpStatus,
+  Logger,
+  Post,
+  Res,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
+import express from 'express';
+import { VivaWebhookService } from './viva-webhook.service';
+import { Public } from 'src/decorators/public.decorator';
+import { VivaWebhookPayload } from './viva-webhook.dto';
+import { error } from 'console';
+import { stat } from 'fs';
 
 @Controller('api/webhooks/viva')
 export class VivaWebhookController {
-    private readonly logger = new Logger(VivaWebhookController.name);
-    constructor(private readonly service: VivaWebhookService) {}
+  private readonly logger = new Logger(VivaWebhookController.name);
+  constructor(private readonly service: VivaWebhookService) {}
 
-    @Public()
-    @Get()
-    getVerificationKey(@Res() res: express.Response) {
-        const verificationKey = process.env.VIVA_WEBHOOK_VERIFICATION_KEY;
-        
-        if (!verificationKey) {
-            this.logger.error('VIVA_WEBHOOK_VERIFICATION_KEY is not set in environment variables');
-            return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                error: "Webhook verification key not configured"
-            });
-        }
+  @Public()
+  @Get()
+  getVerificationKey(@Res() res: express.Response) {
+    const verificationKey = process.env.VIVA_WEBHOOK_VERIFICATION_KEY;
 
-        return res.status(HttpStatus.OK).json({
-            Key: verificationKey
-        });
+    if (!verificationKey) {
+      this.logger.error(
+        'VIVA_WEBHOOK_VERIFICATION_KEY is not set in environment variables',
+      );
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        error: 'Webhook verification key not configured',
+      });
     }
 
+    return res.status(HttpStatus.OK).json({
+      Key: verificationKey,
+    });
+  }
 
-    @Public()
-    @Post()
-    @UsePipes(new ValidationPipe({whitelist: false, forbidNonWhitelisted: false}))
-    async processWebhook(
-        @Body() payload: VivaWebhookPayload,
-        @Res() res: express.Response
-    ) {
-        try {
-            this.logger.log("Received viva webhook payload:", {
-                eventType: payload.EventTypeId,
-                transactionId: payload.EventData.TransactionId,
-            });
+  @Public()
+  @Post()
+  async processWebhook(@Body() payload: any, @Res() res: express.Response) {
+    try {
+      this.logger.log(
+        'Received viva webhook payload:',
+        JSON.stringify(payload, null, 2),
+      );
 
-            //process the webhook payload
-            await this.service.processPaymentCreatedEvent(payload);
+      // Basic validation before processing
+      if (!payload || typeof payload !== 'object') {
+        throw new Error('Invalid payload: not an object');
+      }
 
-            return res.status(HttpStatus.OK).json({
-                status: "success",
-                message: "Webhook processed successfully"
-            });
-        } catch (error) {
-            this.logger.error("Error processing viva webhook:", error.stack);
+      //process the webhook payload
+      await this.service.processPaymentCreatedEvent(payload);
 
-            return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                status: "error",
-                message: "Failed to process webhook"
-            });
-        }
+      return res.status(HttpStatus.OK).json({
+        status: 'success',
+        message: 'Webhook processed successfully',
+      });
+    } catch (error) {
+      this.logger.error('Error processing viva webhook:', error.stack);
+
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        status: 'error',
+        message: 'Failed to process webhook',
+      });
     }
+  }
 }

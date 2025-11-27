@@ -1,421 +1,238 @@
-/* eslint-disable no-console */
-import { PrismaClient, Role, RideStatus, PaymentProvider, PaymentStatus, NumberSequenceType, ExportArchiveType } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-// --- Small date helpers ---
-const now = new Date();
-function yyyymm(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  return `${y}${m}`;
-}
-function daysAgo(n: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d;
-}
-function addMinutes(date: Date, minutes: number) {
-  return new Date(date.getTime() + minutes * 60000);
-}
+async function main() {
+  console.log('🌱 Starting seed...');
 
-// --- Money helper: store as string to avoid float issues ---
-const money = (n: number) => n.toFixed(2);
-
-// --- Numbering helpers (Receipt/Invoice numbers per period) ---
-async function nextNumber(tenantId: string, type: NumberSequenceType, period: string) {
-  const seq = await prisma.numberSequence.upsert({
-    where: { tenantId_type_period: { tenantId, type, period } },
-    update: { current: { increment: 1 } },
-    create: { tenantId, type, period, current: 1 },
-  });
-  return seq.current.toString().padStart(4, '0'); // e.g., 0001
-}
-function formatReceiptNumber(period: string, n: string) {
-  return `R-${period}-${n}`;
-}
-function formatInvoiceNumber(period: string, n: string) {
-  return `I-${period}-${n}`;
-}
-
-// Create rides + (optionally) a paid payment with numbered receipt/invoice
-async function createRideWithOptionalPayment(params: {
-  tenantId: string;
-  driverProfileId: string;
-  pricingPolicyId: string | null;
-  startedAt: Date;
-  durationMin: number;
-  distanceKm: number;
-  status: RideStatus;
-  paid?: boolean; // if true -> create Payment with numbering
-  provider?: PaymentProvider;
-}) {
-  const { tenantId, driverProfileId, pricingPolicyId, startedAt, durationMin, distanceKm, status, paid, provider } = params;
-
-  const endedAt = status === RideStatus.ONGOING ? null : addMinutes(startedAt, durationMin);
-  const fareSubtotal = 5 + 0.75 * durationMin + 1.10 * distanceKm; // simple formula for demo
-  const taxAmount = fareSubtotal * 0.14; // 14% VAT for taxi transport per your earlier notes
-  const fareTotal = fareSubtotal + taxAmount;
-
-  const ride = await prisma.ride.create({
+  // Create First Tenant (Helsinki)
+  const helsinkiTenant = await prisma.tenant.create({
     data: {
-      tenantId,
-      driverProfileId,
-      pricingPolicyId: pricingPolicyId ?? undefined,
-      startedAt,
-      endedAt,
-      durationMin: `${durationMin}`,
-      distanceKm: distanceKm.toFixed(3),
-      fareSubtotal: money(fareSubtotal),
-      taxAmount: money(taxAmount),
-      fareTotal: money(fareTotal),
-      status,
+      name: 'Helsinki Taxi Company',
+      businessId: '1234567-8', // Finnish Y-tunnus format
+      settingsJson: {
+        surcharges: [
+          {
+            start: '22:00',
+            end: '06:00',
+            multiplier: '1.5',
+          },
+        ],
+        taxRate: '0.24',
+      },
     },
   });
+  console.log('✅ Created tenant:', helsinkiTenant.name);
 
-  // Create a payment if asked
-  if (paid) {
-    const period = yyyymm(endedAt ?? now);
-    const receiptSeq = await nextNumber(tenantId, NumberSequenceType.RECEIPT, period);
-    const invoiceSeq = await nextNumber(tenantId, NumberSequenceType.INVOICE, period);
-
-    await prisma.payment.create({
-      data: {
-        tenantId,
-        rideId: ride.id,
-        provider: provider ?? PaymentProvider.STRIPE,
-        amount: money(fareTotal),
-        currency: 'EUR',
-        status: PaymentStatus.PAID,
-        authorizedAt: startedAt,
-        capturedAt: endedAt ?? now,
-        externalPaymentId: provider === PaymentProvider.STRIPE ? `pi_${ride.id.slice(0, 8)}` : `viva_${ride.id.slice(0, 8)}`,
-        numberPeriod: period,
-        receiptNumber: formatReceiptNumber(period, receiptSeq),
-        invoiceNumber: formatInvoiceNumber(period, invoiceSeq),
-      },
-    });
-
-    await prisma.paymentLink.create({
-      data: {
-        rideId: ride.id,
-        provider: provider ?? PaymentProvider.STRIPE,
-        url: `https://pay.example/${ride.id}`,
-        status: 'CONSUMED',
-        createdAt: startedAt,
-        expiresAt: addMinutes(startedAt, 60),
-      },
-    });
-  } else {
-    // Add a link that remains ACTIVE for pending/uncaptured flows
-    await prisma.paymentLink.create({
-      data: {
-        rideId: ride.id,
-        provider: PaymentProvider.VIVA,
-        url: `https://terminal.example/${ride.id}`,
-        status: 'ACTIVE',
-        createdAt: startedAt,
-        expiresAt: addMinutes(startedAt, 120),
-      },
-    });
-  }
-
-  return ride;
-}
-
-async function main() {
-  console.log('Seeding database…');
-
-  // Optional: clean tables for deterministic seeding in dev
-  // Comment these out if you keep real data locally.
-
-  await prisma.exportArchive.deleteMany();
-  await prisma.numberSequence.deleteMany();
-  await prisma.paymentLink.deleteMany();
-  await prisma.payment.deleteMany();
-  await prisma.ride.deleteMany();
-  await prisma.pricingPolicy.deleteMany();
-  await prisma.driverProfile.deleteMany();
-  await prisma.invitation.deleteMany();
-  await prisma.membership.deleteMany();
-  await prisma.providerAccount.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.tenant.deleteMany();
-
-  // Create tenants
-  const [t1, t2] = await Promise.all([
-    prisma.tenant.create({
-      data: {
-        name: 'MetroTaxi Oy',
-        businessId: '1234567-8',
-        settingsJson: { nightSurcharge: 1.25 },
-      },
-    }),
-    prisma.tenant.create({
-      data: {
-        name: 'CityCab Oy',
-        businessId: '9876543-1',
-        settingsJson: { nightSurcharge: 1.15 },
-      },
-    }),
-  ]);
-
-  // Admin + Manager + (optional) Driver Users
-  const passwordHash = await bcrypt.hash('Password123!', 10);
-
-  const [admin, manager, userDriver] = await Promise.all([
-    prisma.user.create({
-      data: { email: 'admin@metrotaxi.test', username: 'admin', passwordHash, status: 'ACTIVE' },
-    }),
-    prisma.user.create({
-      data: { email: 'manager@metrotaxi.test', username: 'manager', passwordHash, status: 'ACTIVE' },
-    }),
-    prisma.user.create({
-      data: { email: 'driver.user@metrotaxi.test', username: 'driverUser', passwordHash, status: 'ACTIVE' },
-    }),
-  ]);
-
-  // Memberships (tenant-scoped roles)
-  await Promise.all([
-    prisma.membership.create({ data: { userId: admin.id, tenantId: t1.id, role: Role.ADMIN } }),
-    prisma.membership.create({ data: { userId: manager.id, tenantId: t1.id, role: Role.MANAGER } }),
-    prisma.membership.create({ data: { userId: admin.id, tenantId: t2.id, role: Role.ADMIN } }),
-  ]);
-
-  // Driver profiles (one linked to a user, one invited-only)
-  const driverA = await prisma.driverProfile.create({
+  // Create Second Tenant (Tampere)
+  const tampereTenant = await prisma.tenant.create({
     data: {
-      tenantId: t1.id,
-      userId: userDriver.id, // linked driver
-      firstName: 'Anna',
-      lastName: 'Kuljettaja',
-      phone: '+358401234567',
-      email: 'driver.user@metrotaxi.test',
+      name: 'Tampere Taxi Service',
+      businessId: '9876543-2', // Finnish Y-tunnus format
+      settingsJson: {
+        surcharges: [
+          {
+            start: '23:00',
+            end: '05:00',
+            multiplier: '1.3',
+          },
+        ],
+        taxRate: '0.24',
+      },
+    },
+  });
+  console.log('✅ Created tenant:', tampereTenant.name);
+
+  // Create Admin User
+  const adminPasswordHash = await bcrypt.hash('admin123', 10);
+  const adminUser = await prisma.user.create({
+    data: {
+      email: 'admin@helsinkitaxi.fi',
+      username: 'admin',
+      passwordHash: adminPasswordHash,
       status: 'ACTIVE',
     },
   });
+  console.log('✅ Created admin user:', adminUser.email);
 
-  const driverB = await prisma.driverProfile.create({
+  // Create Driver User
+  const driverPasswordHash = await bcrypt.hash('driver123', 10);
+  const driverUser = await prisma.user.create({
     data: {
-      tenantId: t1.id,
-      firstName: 'Matti',
-      lastName: 'Meikäläinen',
-      phone: '+358409876543',
-      status: 'INVITED',
-      email: 'matti@example.test',
+      email: 'john.driver@helsinkitaxi.fi',
+      username: 'johndriver',
+      passwordHash: driverPasswordHash,
+      status: 'ACTIVE',
     },
   });
+  console.log('✅ Created driver user:', driverUser.email);
 
-  // Invitation for driverB
-  await prisma.invitation.create({
+  // Create Admin Memberships (both tenants)
+  const helsinkiAdminMembership = await prisma.membership.create({
     data: {
-      tenantId: t1.id,
-      email: 'matti@example.test',
-      role: Role.DRIVER,
-      token: 'INVITE-TOKEN-123',
-      expiresAt: addMinutes(now, 60 * 24 * 7),
-      invitedByUserId: admin.id,
-      driverProfileId: driverB.id,
+      userId: adminUser.id,
+      tenantId: helsinkiTenant.id,
+      role: 'ADMIN',
     },
   });
+  console.log('✅ Created Helsinki admin membership');
 
-  // Pricing policies (enforce single active per tenant)
-  const pricing1 = await prisma.pricingPolicy.create({
+  const tampereAdminMembership = await prisma.membership.create({
     data: {
-      tenantId: t1.id,
-      name: 'Default 2025',
-      baseFare: '5.00',
-      perKm: '1.1000',
+      userId: adminUser.id,
+      tenantId: tampereTenant.id,
+      role: 'ADMIN',
+    },
+  });
+  console.log('✅ Created Tampere admin membership');
+
+  // Create Driver Profile for the driver user (Helsinki)
+  const driverProfile = await prisma.driverProfile.create({
+    data: {
+      tenantId: helsinkiTenant.id,
+      userId: driverUser.id,
+      firstName: 'John',
+      lastName: 'Virtanen',
+      email: 'john.driver@helsinkitaxi.fi',
+      phone: '+358401234567',
+      status: 'ACTIVE',
+    },
+  });
+  console.log(
+    '✅ Created driver profile:',
+    `${driverProfile.firstName} ${driverProfile.lastName}`,
+  );
+
+  // Create Driver Membership (Helsinki)
+  const driverMembership = await prisma.membership.create({
+    data: {
+      userId: driverUser.id,
+      tenantId: helsinkiTenant.id,
+      role: 'DRIVER',
+    },
+  });
+  console.log('✅ Created driver membership (Helsinki)');
+
+  // Create First Pricing Policy (Standard - Helsinki)
+  const standardPricing = await prisma.pricingPolicy.create({
+    data: {
+      tenantId: helsinkiTenant.id,
+      name: 'Standard Pricing',
+      baseFare: 3.5,
+      perKm: 1.25,
+      perMin: 0.35,
       isActive: true,
     },
   });
+  console.log('✅ Created pricing policy:', standardPricing.name);
 
-  await prisma.pricingPolicy.create({
+  // Create Second Pricing Policy (Premium - Helsinki)
+  const premiumPricing = await prisma.pricingPolicy.create({
     data: {
-      tenantId: t1.id,
-      name: 'Old 2024',
-      baseFare: '4.50',
-      perKm: '1.0000',
+      tenantId: helsinkiTenant.id,
+      name: 'Premium Pricing',
+      baseFare: 5.0,
+      perKm: 1.8,
+      perMin: 0.5,
       isActive: false,
     },
   });
+  console.log('✅ Created pricing policy:', premiumPricing.name);
 
-  const pricing2 = await prisma.pricingPolicy.create({
+  // Create Tampere Pricing Policies
+  const tamperStandardPricing = await prisma.pricingPolicy.create({
     data: {
-      tenantId: t2.id,
-      name: 'City 2025',
-      baseFare: '4.75',
-      perKm: '1.0500',
+      tenantId: tampereTenant.id,
+      name: 'Tampere Standard',
+      baseFare: 3.0,
+      perKm: 1.15,
+      perMin: 0.3,
       isActive: true,
     },
   });
+  console.log('✅ Created pricing policy:', tamperStandardPricing.name);
 
-  // Provider accounts (Stripe + Viva per tenant)
-  await Promise.all([
-    prisma.providerAccount.create({
-      data: {
-        tenantId: t1.id,
-        provider: PaymentProvider.STRIPE,
-        externalAccountId: 'acct_1MetroTaxi',
-        connectedAt: daysAgo(20),
-        livemode: false,
-        metadataJson: { displayName: 'MetroTaxi Stripe' },
-      },
-    }),
-    prisma.providerAccount.create({
-      data: {
-        tenantId: t1.id,
-        provider: PaymentProvider.VIVA,
-        externalAccountId: 'viva_merchant_metrotaxi',
-        connectedAt: daysAgo(18),
-        livemode: false,
-        metadataJson: { terminalType: 'Tap-on-Phone' },
-      },
-    }),
-    prisma.providerAccount.create({
-      data: {
-        tenantId: t2.id,
-        provider: PaymentProvider.STRIPE,
-        externalAccountId: 'acct_1CityCab',
-        connectedAt: daysAgo(30),
-        livemode: false,
-        metadataJson: { displayName: 'CityCab Stripe' },
-      },
-    }),
-  ]);
+  // Create a completed ride with Viva payment
+  const rideStartTime = new Date('2025-11-18T10:30:00Z');
+  const rideEndTime = new Date('2025-11-18T10:48:00Z');
 
-  // Rides for T1 (mix of statuses; some paid)
-  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-
-  // Completed + paid (Stripe)
-  await createRideWithOptionalPayment({
-    tenantId: t1.id,
-    driverProfileId: driverA.id,
-    pricingPolicyId: pricing1.id,
-    startedAt: addMinutes(thisMonthStart, 60), // this month
-    durationMin: 18,
-    distanceKm: 6.2,
-    status: RideStatus.COMPLETED,
-    paid: true,
-    provider: PaymentProvider.STRIPE,
-  });
-
-  // Completed + paid (Viva)
-  await createRideWithOptionalPayment({
-    tenantId: t1.id,
-    driverProfileId: driverA.id,
-    pricingPolicyId: pricing1.id,
-    startedAt: addMinutes(thisMonthStart, 180),
-    durationMin: 27,
-    distanceKm: 11.4,
-    status: RideStatus.COMPLETED,
-    paid: true,
-    provider: PaymentProvider.VIVA,
-  });
-
-  // Ongoing (no payment yet)
-  await createRideWithOptionalPayment({
-    tenantId: t1.id,
-    driverProfileId: driverA.id,
-    pricingPolicyId: pricing1.id,
-    startedAt: addMinutes(now, -20),
-    durationMin: 45,
-    distanceKm: 14.9,
-    status: RideStatus.ONGOING,
-  });
-
-  // Draft
-  await createRideWithOptionalPayment({
-    tenantId: t1.id,
-    driverProfileId: driverB.id,
-    pricingPolicyId: pricing1.id,
-    startedAt: addMinutes(now, -120),
-    durationMin: 0,
-    distanceKm: 0,
-    status: RideStatus.DRAFT,
-  });
-
-  // Last month paid (Stripe)
-  await createRideWithOptionalPayment({
-    tenantId: t1.id,
-    driverProfileId: driverA.id,
-    pricingPolicyId: pricing1.id,
-    startedAt: addMinutes(lastMonthStart, 90),
-    durationMin: 22,
-    distanceKm: 7.5,
-    status: RideStatus.COMPLETED,
-    paid: true,
-    provider: PaymentProvider.STRIPE,
-  });
-
-  // Rides for T2
-  const driverC = await prisma.driverProfile.create({
+  const sampleRide = await prisma.ride.create({
     data: {
-      tenantId: t2.id,
-      firstName: 'Sari',
-      lastName: 'Suhari',
-      phone: '+358401112223',
-      status: 'ACTIVE',
-      email: 'sari@example.test',
+      tenantId: helsinkiTenant.id,
+      driverProfileId: driverProfile.id,
+      pricingPolicyId: standardPricing.id,
+      startedAt: rideStartTime,
+      endedAt: rideEndTime,
+      durationMin: 18.0, // 18 minutes
+      distanceKm: 12.5, // 12.5 km
+      fareSubtotal: 19.13, // baseFare (3.50) + perKm (1.25 * 12.5) + perMin (0.35 * 18)
+      taxAmount: 4.59, // 24% tax
+      fareTotal: 23.72, // subtotal + tax
+      status: 'COMPLETED',
     },
   });
+  console.log(
+    '✅ Created sample ride:',
+    `${sampleRide.distanceKm}km, €${sampleRide.fareTotal}`,
+  );
 
-  await createRideWithOptionalPayment({
-    tenantId: t2.id,
-    driverProfileId: driverC.id,
-    pricingPolicyId: pricing2.id,
-    startedAt: addMinutes(thisMonthStart, 240),
-    durationMin: 30,
-    distanceKm: 9.3,
-    status: RideStatus.COMPLETED,
-    paid: true,
-    provider: PaymentProvider.STRIPE,
+  // Create Viva payment for the ride
+  const vivaPayment = await prisma.payment.create({
+    data: {
+      rideId: sampleRide.id,
+      tenantId: helsinkiTenant.id,
+      provider: 'VIVA',
+      amount: sampleRide.fareTotal!,
+      currency: 'EUR',
+      status: 'PAID',
+      authorizedAt: rideEndTime,
+      capturedAt: new Date(rideEndTime.getTime() + 2 * 60 * 1000), // 2 minutes after ride end
+      externalPaymentId: 'viva_tx_1234567890',
+      approvalCode: 'APP123456',
+      receiptNumber: '001',
+      numberPeriod: '202511', // November 2025
+    },
   });
+  console.log(
+    '✅ Created Viva payment:',
+    `€${vivaPayment.amount}, Status: ${vivaPayment.status}`,
+  );
 
-  await createRideWithOptionalPayment({
-    tenantId: t2.id,
-    driverProfileId: driverC.id,
-    pricingPolicyId: pricing2.id,
-    startedAt: addMinutes(now, -180),
-    durationMin: 15,
-    distanceKm: 4.2,
-    status: RideStatus.CANCELLED,
-  });
-
-  // Export archives for “this month” per tenant (rough aggregates just for demo)
-  for (const tenant of [t1, t2]) {
-    const period = yyyymm(now);
-
-    const paidThisMonth = await prisma.payment.findMany({
-      where: { tenantId: tenant.id, numberPeriod: period, status: PaymentStatus.PAID },
-      select: { amount: true },
-    });
-
-    const totalAmount = paidThisMonth.reduce((sum, p) => sum + Number(p.amount), 0);
-    await prisma.exportArchive.create({
-      data: {
-        tenantId: tenant.id,
-        period,
-        type: ExportArchiveType.simplified,
-        createdByUserId: admin.id,
-        pdfPath: `/exports/${tenant.name}-${period}-simplified.pdf`,
-        jsonPath: `/exports/${tenant.name}-${period}-simplified.json`,
-        sha256: 'demo_sha256_placeholder',
-        count: paidThisMonth.length,
-        totalAmount: money(totalAmount),
-      },
-    });
-  }
-
-
-  console.log('Seeding complete ✅');
+  console.log('\n🎉 Seed completed successfully!');
+  console.log('\n📋 Summary:');
+  console.log(
+    `- Helsinki Tenant: ${helsinkiTenant.name} (ID: ${helsinkiTenant.id})`,
+  );
+  console.log(
+    `- Tampere Tenant: ${tampereTenant.name} (ID: ${tampereTenant.id})`,
+  );
+  console.log(`- Admin User: ${adminUser.email} (Password: admin123)`);
+  console.log(`- Driver User: ${driverUser.email} (Password: driver123)`);
+  console.log(
+    `- Driver Profile: ${driverProfile.firstName} ${driverProfile.lastName}`,
+  );
+  console.log(
+    `- Helsinki Active: ${standardPricing.name} (€${standardPricing.baseFare} + €${standardPricing.perKm}/km)`,
+  );
+  console.log(
+    `- Helsinki Inactive: ${premiumPricing.name} (€${premiumPricing.baseFare} + €${premiumPricing.perKm}/km)`,
+  );
+  console.log(
+    `- Tampere Active: ${tamperStandardPricing.name} (€${tamperStandardPricing.baseFare} + €${tamperStandardPricing.perKm}/km)`,
+  );
+  console.log(`- Memberships: 3 (admin in 2 tenants, driver in 1 tenant)`);
+  console.log(
+    `- Sample Ride: ${sampleRide.distanceKm}km, ${sampleRide.durationMin}min, €${sampleRide.fareTotal}`,
+  );
+  console.log(
+    `- Viva Payment: €${vivaPayment.amount}, ${vivaPayment.status} (${vivaPayment.externalPaymentId})`,
+  );
 }
 
 main()
   .catch((e) => {
-    console.error('Seed error:', e);
+    console.error('❌ Seed failed:', e);
     process.exit(1);
   })
   .finally(async () => {

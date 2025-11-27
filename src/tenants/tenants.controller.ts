@@ -1,7 +1,8 @@
-import { Controller, Get, Param, Request, UseGuards, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Param, Request, UseGuards, ForbiddenException, NotFoundException, Post } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantsService } from './tenants.service';
+import { TenantSelectionsDto } from './dto/tenantsDto';
 
 @ApiTags('tenants')
 @ApiBearerAuth('JWT-auth')
@@ -74,5 +75,12 @@ export class TenantsController {
     }
 
     return this.tenantsService.getTenantById(tenantId);
+  }
+
+
+  @Post("select-tenant")
+  async getMyTenants(@Request() req): Promise<TenantSelectionsDto> {
+    const userId = req.user.sub;
+    return this.tenantsService.getTenantsForUser(userId);
   }
 }

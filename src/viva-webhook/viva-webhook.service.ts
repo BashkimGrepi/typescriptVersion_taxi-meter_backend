@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { VivaWebhookPayload } from './viva-webhook.dto';
-import axios from 'axios';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PaymentStatus } from '@prisma/client';
 
@@ -85,11 +84,12 @@ export class VivaWebhookService {
       return { status: 'error', reason: 'merchant_id_mismatch' };
     }
 
-    // find the payment by orderCode (ride id)
+    // find the payment by orderCode (id)
     const payment = await this.prisma.payment.findFirst({
       where: {
-        rideId: OrderCode.toString(),
+        id: OrderCode.toString(),
         status: PaymentStatus.PENDING,
+        // NEEDS TENANT CHECK
       },
     });
     if (!payment) {
@@ -119,9 +119,6 @@ export class VivaWebhookService {
         status: PaymentStatus.PAID,
         externalPaymentId: TransactionId,
         capturedAt: new Date(),
-        
-          
-          
       },
     });
     // mark webhook as processed
@@ -136,12 +133,30 @@ export class VivaWebhookService {
 
     this.logger.log('Payment successfully updated to PAID', {
       paymentId: payment.id,
-      rideId: OrderCode,
+      id: OrderCode,
       transactionId: TransactionId,
       amount: Amount,
     });
+    return { status: 'ok', paymentId: payment.id };
   }
 
+  /*
+  markWebhookFailed semantics
+
+    You sometimes call markWebhookFailed with markAsProcessed left as false (the default), e.g. for merchant mismatch, amount mismatch.
+
+    That means:
+
+    attemptCount increments,
+
+    errorMessage is stored,
+
+    but processedAt is not set.
+
+    So if you later add retry logic, those will keep retrying even though the error is probably permanent (e.g. misconfig of MerchantId or wrong OrderCode).
+
+    Not a bug now, but something to keep in mind when you implement retries.
+  */
   async markWebhookFailed(
     webhookId: string,
     errorMessage: string,

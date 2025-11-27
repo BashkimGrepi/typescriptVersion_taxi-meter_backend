@@ -19,8 +19,7 @@ import {
   PaymentMethodReportResponse
 } from '../dto/report-admin.dto';
 
-@ApiTags('admin-reports')
-@ApiBearerAuth('JWT-auth')
+
 @Controller('admin/reports')
 @UseGuards(JwtAuthGuard, AdminRoleGuard)
 @AdminRoles('ADMIN', 'MANAGER')
@@ -31,21 +30,6 @@ export class AdminReportController {
   ) {}
 
   @Get('revenue')
-  @ApiOperation({
-    summary: 'Get revenue report (Admin/Manager)',
-    description: 'Get revenue analytics with time-series data for the current tenant'
-  })
-  @ApiQuery({ name: 'from', required: false, description: 'Start date filter (ISO string)' })
-  @ApiQuery({ name: 'to', required: false, description: 'End date filter (ISO string)' })
-  @ApiQuery({ name: 'driverId', required: false, description: 'Filter by driver profile ID' })
-  @ApiQuery({ name: 'granularity', required: false, enum: ['daily', 'weekly', 'monthly'], example: 'daily' })
-  @ApiResponse({
-    status: 200,
-    description: 'Revenue report retrieved successfully',
-    type: RevenueReportResponse
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid JWT token' })
-  @ApiResponse({ status: 403, description: 'Forbidden - ADMIN or MANAGER role required' })
   async getRevenueReport(
     @Query(new ValidationPipe({ transform: true })) query: ReportsQueryDto,
     @Request() req
@@ -55,19 +39,6 @@ export class AdminReportController {
   }
 
   @Get('driver-performance')
-  @ApiOperation({
-    summary: 'Get driver performance report (Admin/Manager)',
-    description: 'Get driver performance analytics and fleet summary for the current tenant'
-  })
-  @ApiQuery({ name: 'from', required: false, description: 'Start date filter (ISO string)' })
-  @ApiQuery({ name: 'to', required: false, description: 'End date filter (ISO string)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Driver performance report retrieved successfully',
-    type: DriverPerformanceResponse
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid JWT token' })
-  @ApiResponse({ status: 403, description: 'Forbidden - ADMIN or MANAGER role required' })
   async getDriverPerformanceReport(
     @Query(new ValidationPipe({ transform: true })) query: ReportsQueryDto,
     @Request() req
@@ -77,19 +48,6 @@ export class AdminReportController {
   }
 
   @Get('payment-methods')
-  @ApiOperation({
-    summary: 'Get payment method report (Admin/Manager)',
-    description: 'Get payment method breakdown and statistics for the current tenant'
-  })
-  @ApiQuery({ name: 'from', required: false, description: 'Start date filter (ISO string)' })
-  @ApiQuery({ name: 'to', required: false, description: 'End date filter (ISO string)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Payment method report retrieved successfully',
-    type: PaymentMethodReportResponse
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid JWT token' })
-  @ApiResponse({ status: 403, description: 'Forbidden - ADMIN or MANAGER role required' })
   async getPaymentMethodReport(
     @Query(new ValidationPipe({ transform: true })) query: ReportsQueryDto,
     @Request() req
@@ -99,39 +57,6 @@ export class AdminReportController {
   }
 
   @Get('summary')
-  @ApiOperation({
-    summary: 'Get dashboard summary (Admin/Manager)',
-    description: 'Get key metrics and KPIs for dashboard display'
-  })
-  @ApiQuery({ name: 'from', required: false, description: 'Start date filter (ISO string)' })
-  @ApiQuery({ name: 'to', required: false, description: 'End date filter (ISO string)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Dashboard summary retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        period: { type: 'string', example: '2024-01-01 to 2024-01-31' },
-        totalRides: { type: 'number', example: 450 },
-        totalRevenue: { type: 'string', example: '12505.75' },
-        totalDistance: { type: 'string', example: '4235.8' },
-        avgFarePerRide: { type: 'string', example: '27.79' },
-        activeDrivers: { type: 'number', example: 15 },
-        completionRate: { type: 'string', example: '94.2' },
-        paymentRate: { type: 'string', example: '96.5' },
-        topDriver: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', example: 'John Doe' },
-            rides: { type: 'number', example: 89 },
-            revenue: { type: 'string', example: '2456.50' }
-          }
-        }
-      }
-    }
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid JWT token' })
-  @ApiResponse({ status: 403, description: 'Forbidden - ADMIN or MANAGER role required' })
   async getDashboardSummary(
     @Query(new ValidationPipe({ transform: true })) query: ReportsQueryDto,
     @Request() req

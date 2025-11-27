@@ -55,6 +55,7 @@ export class PricingService {
           // baseFare/perKm are Decimal in Prisma; we return them as strings to avoid FP rounding bugs
           baseFare: true,
           perKm: true,
+          perMin: true,
           createdAt: true,
           updatedAt: true,
         },
