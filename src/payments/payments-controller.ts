@@ -11,11 +11,10 @@ import {
 } from '@nestjs/common';
 import { PaymentsService } from './payments-service';
 import * as payments from './types/payments';
-import { DriverV1Guard } from 'src/auth/guards/driver-v1.guard';
-
+import { UniversalV1Guard } from 'src/auth/guards/universal-v1.guard';
 
 @Controller('driver/payments')
-@UseGuards(DriverV1Guard) // protects route and contains jwt authentication
+@UseGuards(UniversalV1Guard) // protects route and contains jwt authentication
 export class PaymentsController {
   constructor(private service: PaymentsService) {}
 
@@ -27,9 +26,6 @@ export class PaymentsController {
 
     return this.service.getPaymentById(paymentId);
   }
-
-
-
 
   // Confirm payment with cash method ->> needs modification in the service
   @Post(':id/confirm/cash')

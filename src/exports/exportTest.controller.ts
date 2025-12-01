@@ -7,10 +7,10 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { UniversalV1Guard } from 'src/auth/guards/universal-v1.guard';
 import { NumberingService } from './numbering.service';
 
-@UseGuards(JwtAuthGuard) // WHY: enforce login; we also want tenantId from token
+@UseGuards(UniversalV1Guard) // WHY: enforce login; we also want tenantId from token
 @Controller('admin/exports')
 export class ExportsTestController {
   constructor(private readonly numbering: NumberingService) {}

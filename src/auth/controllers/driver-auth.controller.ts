@@ -3,20 +3,13 @@ import { AuthService } from '../auth.service';
 import { LoginDto } from '../dto/driver/login.dto';
 import { SelectTenantDto } from '../dto/driver/select-tenant.dto';
 import { Public } from 'src/decorators/public.decorator';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { DriverV1Guard } from '../guards/driver-v1.guard';
+import { UniversalV1Guard } from '../guards/universal-v1.guard';
 
 @Controller('auth/driver')
 export class DriverAuthController {
   private readonly logger = new Logger(DriverAuthController.name);
 
   constructor(private authService: AuthService) {}
-
-  @Public()
-  @Post('login')
-  async loginDriver(@Body() loginDto: LoginDto) {
-    return this.authService.loginDriver(loginDto);
-  }
 
   @Public()
   @Post('login-v1')
@@ -35,18 +28,7 @@ export class DriverAuthController {
     }
   }
 
-  @Public()
-  @Post('select-tenant')
-  async selectTenantDriver(@Body() dto: SelectTenantDto, @Req() req: Request) {
-    const fromHeader = req.headers['authorization']?.startsWith('Bearer ')
-      ? req.headers['authorization'].slice(7)
-      : undefined;
 
-    return this.authService.selectTenantDriver({
-      loginTicket: dto.loginTicket ?? fromHeader,
-      tenantId: dto.tenantId,
-    });
-  }
 
   @Public()
   @Post('select-tenant-v1')
@@ -85,7 +67,7 @@ export class DriverAuthController {
   
   
   @Post('logout-v1')
-  @UseGuards(DriverV1Guard)
+  @UseGuards(UniversalV1Guard)
   async logoutDriver(@Req() req: any): Promise<{ message: string }> {
     try {
       const { jti, exp } = req.user;
@@ -99,7 +81,7 @@ export class DriverAuthController {
   }
 
   @Post('logout-all-devices')
-  @UseGuards(DriverV1Guard)
+  @UseGuards(UniversalV1Guard)
   async logoutAllDevices(@Req() req: any): Promise<{ message: string }> {
     try {
       await this.authService.revokeAllDriverTokens(req.user.sub);

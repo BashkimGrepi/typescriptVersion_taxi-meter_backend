@@ -11,8 +11,7 @@ import {
   ValidationPipe
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { AdminRoleGuard } from '../guards/admin-role.guard';
+import { UniversalV1Guard } from '../../auth/guards/universal-v1.guard';
 import { AdminRoles } from '../decorators/admin-role.decorator';
 import { AdminDriverService } from '../services/admin-driver.service';
 import { 
@@ -26,7 +25,7 @@ import {
 @ApiTags('admin-drivers')
 @ApiBearerAuth('JWT-auth')
 @Controller('admin/drivers')
-@UseGuards(JwtAuthGuard, AdminRoleGuard)
+@UseGuards(UniversalV1Guard) // can be removed if global guard is set. ->  it is now
 @AdminRoles('ADMIN', 'MANAGER')
 export class AdminDriverController {
   constructor(private adminDriverService: AdminDriverService) {}

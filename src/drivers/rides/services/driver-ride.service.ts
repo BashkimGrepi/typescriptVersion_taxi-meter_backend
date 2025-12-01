@@ -1,21 +1,39 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
-import { PrismaService } from "src/prisma/prisma.service";
-import { StartRideDto } from "../dto/StartRideDto";
-import { StartRideResponseDto } from "../dto/StartRideResponseDto";
-import { Prisma, RideStatus, Ride, PaymentProvider, PaymentStatus } from "@prisma/client";
-import { EndRideDto, EndRideResponseDto, FareBreakdownDto } from "../dto/EndRideDto";
-import { TodaysSummaryDto } from "../dto/TodaysSummary";
-import { RideHistoryItemDto, RideHistoryRequestDto, RideHistoryResponseDto } from "../dto/RideHistoryDto";
-import { RideDetailsDto } from "../dto/RideDetailsDto";
-
-
-
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { StartRideDto } from '../dto/StartRideDto';
+import { StartRideResponseDto } from '../dto/StartRideResponseDto';
+import {
+  Prisma,
+  RideStatus,
+  Ride,
+  PaymentProvider,
+  PaymentStatus,
+  RidePricingMode,
+} from '@prisma/client';
+import {
+  EndRideDto,
+  EndRideResponseDto,
+  FareBreakdownDto,
+} from '../dto/EndRideDto';
+import { TodaysSummaryDto } from '../dto/TodaysSummary';
+import {
+  RideHistoryItemDto,
+  RideHistoryRequestDto,
+  RideHistoryResponseDto,
+} from '../dto/RideHistoryDto';
+import { RideDetailsDto } from '../dto/RideDetailsDto';
+import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class DriverRideService {
-    
-  constructor(private prisma: PrismaService) { }
-
+  constructor(private prisma: PrismaService) {}
 
   /** Format Prisma.Decimal or number to a 2-dp string for money */
   private money(v: Prisma.Decimal | number | null | undefined): string {
@@ -25,7 +43,10 @@ export class DriverRideService {
   }
 
   /** Option A: read night surcharge windows from Tenant.settingsJson */
-  private getNightTimeMultiplier(settings: any, at: Date): Prisma.Decimal | null {
+  private getNightTimeMultiplier(
+    settings: any,
+    at: Date,
+  ): Prisma.Decimal | null {
     try {
       if (!settings || !Array.isArray(settings.surcharges)) return null;
 
@@ -58,27 +79,36 @@ export class DriverRideService {
     return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
   }
 
-
-
   // Mapping function to convert Ride to StartRideResponseDto
   private mapRideToStartRideResponseDto(ride: Ride): StartRideResponseDto {
     return {
       rideId: ride.id,
       status: ride.status,
       startedAt: ride.startedAt,
-      pricingPolicyId: ride.pricingPolicyId,
-      driverProfileId: ride.driverProfileId,
       tenantId: ride.tenantId,
+      driverProfileId: ride.driverProfileId,
+      pricingMode: ride.pricingMode,
+
+      // Mode-specific fields (null when not applicable)
+      pricingPolicyId: ride.pricingPolicyId || undefined,
+      fixedPricePolicyId: ride.fixedPricePolicyId || undefined,
+      customFixedFare: ride.customFixedFare?.toString() || undefined,
+
+      // Fare details (null at start)
       durationMin: ride.durationMin,
       distanceKm: ride.distanceKm,
       fareSubtotal: ride.fareSubtotal,
       taxAmount: ride.taxAmount,
-      fareTotal: ride.fareTotal
+      fareTotal: ride.fareTotal,
     };
   }
 
   // start Ride -> for mobile application
-  async startRide(args: { dto: StartRideDto; userId: string; tenantId: string }): Promise<StartRideResponseDto> {
+  async startRide(args: {
+    dto: StartRideDto;
+    userId: string;
+    tenantId: string;
+  }): Promise<StartRideResponseDto> {
     const { dto, userId, tenantId } = args;
 
     //check if tenant active
@@ -94,8 +124,8 @@ export class DriverRideService {
       where: {
         userId: userId,
         tenantId: tenantId,
-        status: 'ACTIVE' // Add enum profileStatus to schema
-      }
+        status: 'ACTIVE', // Add enum profileStatus to schema
+      },
     });
     if (!driverProfile) {
       throw new NotFoundException('Driver profile not found or inactive');
@@ -106,66 +136,151 @@ export class DriverRideService {
     const ongoingRide = await this.prisma.ride.findFirst({
       where: {
         driverProfileId: driverProfileId,
-        status: { in: [RideStatus.DRAFT, RideStatus.ONGOING] }
-      }
+        status: { in: [RideStatus.DRAFT, RideStatus.ONGOING] },
+      },
     });
     if (ongoingRide) {
-      if (ongoingRide.status === RideStatus.DRAFT && dto.rideStatus === RideStatus.ONGOING) {
+      if (
+        ongoingRide.status === RideStatus.DRAFT &&
+        dto.rideStatus === RideStatus.ONGOING
+      ) {
         const updatedRide = await this.prisma.ride.update({
           where: { id: ongoingRide.id },
           data: {
             status: RideStatus.ONGOING,
-            startedAt: new Date()
-          }
+            startedAt: new Date(),
+          },
         });
         return this.mapRideToStartRideResponseDto(updatedRide);
       }
       return this.mapRideToStartRideResponseDto(ongoingRide);
     }
-    // fetch active pricing policy
-    const pricingPolicy = await this.prisma.pricingPolicy.findFirst({
-      where: {
-        tenantId: tenantId,
-        isActive: true
-      }
-    });
-    if (!pricingPolicy) {
-      throw new UnprocessableEntityException('No active pricing policy found for this tenant');
+
+    let pricingPolicyId: string | null = null;
+    let fixedPricePolicyId: string | null = null;
+    let customFixedFare: Decimal | null = null;
+
+    switch (dto.pricingMode) {
+      case RidePricingMode.METER:
+        pricingPolicyId = await this.validateMeterMode(tenantId);
+        break;
+
+      case RidePricingMode.FIXED_PRICE:
+        fixedPricePolicyId = await this.validateFixedPriceMode(
+          tenantId,
+          driverProfile.id,
+          dto.fixedPricingPolicyId!,
+        );
+        break;
+
+      case RidePricingMode.CUSTOM_FIXED:
+        customFixedFare = await this.validateCustomFixedMode(
+          dto.customFixedFare!,
+        );
+        break;
     }
-    const pricingPolicyId = pricingPolicy.id;
 
     const newRide = await this.prisma.ride.create({
       data: {
         tenantId,
         driverProfileId,
-        pricingPolicyId,
         startedAt: new Date(),
-        durationMin: new Prisma.Decimal("0.00"),
-        distanceKm: new Prisma.Decimal("0.000"),
+        status: dto.rideStatus,
+
+        pricingMode: dto.pricingMode,
+        pricingPolicyId,
+        fixedPricePolicyId,
+        customFixedFare,
+
+        durationMin: new Prisma.Decimal('0.00'),
+        distanceKm: new Prisma.Decimal('0.000'),
         fareSubtotal: null,
         taxAmount: null,
         fareTotal: null,
-        status: dto.rideStatus
-      }
+      },
     });
 
     return this.mapRideToStartRideResponseDto(newRide);
   }
 
+  private async validateMeterMode(tenantId: string): Promise<string> {
+    const activePricingPolicy = await this.prisma.pricingPolicy.findFirst({
+      where: { tenantId, isActive: true },
+      select: { id: true },
+    });
+
+    if (!activePricingPolicy) {
+      throw new UnprocessableEntityException(
+        'No active meter pricing policy found',
+      );
+    }
+
+    return activePricingPolicy.id;
+  }
+
+  private async validateFixedPriceMode(
+    tenantId: string,
+    driverProfileId: string,
+    policyId: string,
+  ): Promise<string> {
+    const fixedPolicy = await this.prisma.fixedPricePolicy.findFirst({
+      where: {
+        id: policyId,
+        tenantId,
+        isActive: true,
+        OR: [
+          { driverProfileId: null }, // tenant-wide
+          { driverProfileId }, // driver's personal
+        ],
+      },
+      select: { id: true, name: true, amount: true },
+    });
+
+    if (!fixedPolicy) {
+      throw new NotFoundException(
+        'Fixed price policy not found or not accessible',
+      );
+    }
+
+    return fixedPolicy.id;
+  }
+
+  private async validateCustomFixedMode(customFare: string): Promise<Decimal> {
+    const fareAmount = new Prisma.Decimal(customFare);
+
+    // Additional business rule validations
+    if (fareAmount.lessThan(5)) {
+      throw new BadRequestException('Custom fare must be at least €5.00');
+    }
+
+    if (fareAmount.greaterThan(999.99)) {
+      throw new BadRequestException('Custom fare cannot exceed €999.99');
+    }
+
+    return fareAmount;
+  }
   // end Ride -> for mobile application
-  async endRide(args: { dto: EndRideDto; userId: string; tenantId: string }): Promise<EndRideResponseDto> {
+  async endRide(args: {
+    dto: EndRideDto;
+    userId: string;
+    tenantId: string;
+  }): Promise<EndRideResponseDto> {
     const { dto, userId, tenantId } = args;
 
     // 1) Tenant exists
-    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant || tenant.deletedAt) throw new NotFoundException('Tenant does not exist or is deleted');
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    if (!tenant || tenant.deletedAt)
+      throw new NotFoundException('Tenant does not exist or is deleted');
 
     // 2) Resolve driver profile (must be ACTIVE in this tenant)
     const driverProfile = await this.prisma.driverProfile.findFirst({
       where: { userId, tenantId, status: 'ACTIVE' },
       select: { id: true },
     });
-    if (!driverProfile) throw new NotFoundException('Driver profile not found or inactive');
+    if (!driverProfile)
+      throw new NotFoundException('Driver profile not found or inactive');
 
     // 3) Load ONGOING ride for this driver
     const ride = await this.prisma.ride.findFirst({
@@ -180,10 +295,15 @@ export class DriverRideService {
         tenantId: true,
         driverProfileId: true,
         startedAt: true,
-        pricingPolicyId: true,
+
+        pricingMode: true,
+        pricingPolicyId: true, // for METER mode
+        fixedPricePolicyId: true, // for FIXED_PRICE mode
+        customFixedFare: true, // for CUSTOM_FIXED mode
       },
     });
-    if (!ride) throw new NotFoundException('Ongoing ride not found for this driver');
+    if (!ride)
+      throw new NotFoundException('Ongoing ride not found for this driver');
 
     // 4) Time box & basic validation
     const endedAt = dto.endedAt ? new Date(dto.endedAt) : new Date();
@@ -199,42 +319,62 @@ export class DriverRideService {
     const durationMinutes =
       dto.durationMin ?? (endedAt.getTime() - startedAt.getTime()) / 60_000;
 
-    // 5) Pricing policy: use snapshot on ride, else fallback to active
-    let pricing = ride.pricingPolicyId
-      ? await this.prisma.pricingPolicy.findUnique({
-        where: { id: ride.pricingPolicyId },
-        select: { id: true, baseFare: true, perKm: true },
-      })
-      : null;
+    // 5) Calculate fare based on pricing mode
+    let subtotal: Prisma.Decimal;
+    let tax: Prisma.Decimal;
+    let total: Prisma.Decimal;
+    let fareData: any = {};
 
-    if (!pricing) {
-      pricing = await this.prisma.pricingPolicy.findFirst({
-        where: { tenantId, isActive: true },
-        select: { id: true, baseFare: true, perKm: true },
-      });
+    switch (ride.pricingMode) {
+      case RidePricingMode.METER:
+        const meterResult = await this.calculateMeterFare({
+          ride,
+          tenant,
+          endedAt,
+          durationMinutes,
+          distanceKm: dto.distanceKm,
+        });
+        subtotal = meterResult.subtotal;
+        tax = meterResult.tax;
+        total = meterResult.total;
+        fareData = {
+          base: meterResult.base,
+          distanceComponent: meterResult.distanceComponent,
+          timeComponent: meterResult.timeComponent,
+          multiplier: meterResult.multiplier,
+          policyName: meterResult.policyName,
+        };
+        break;
+
+      case RidePricingMode.FIXED_PRICE:
+        const fixedResult = await this.calculateFixedPriceFare({
+          ride,
+          tenantId,
+        });
+        subtotal = fixedResult.subtotal;
+        tax = fixedResult.tax;
+        total = fixedResult.total;
+        fareData = { policyName: fixedResult.policyName };
+        break;
+
+      case RidePricingMode.CUSTOM_FIXED:
+        const customResult = this.calculateCustomFixedFare({ ride });
+        subtotal = customResult.subtotal;
+        tax = customResult.tax;
+        total = customResult.total;
+        fareData = {};
+        break;
+
+      default:
+        throw new UnprocessableEntityException(
+          `Unsupported pricing mode: ${ride.pricingMode}`,
+        );
     }
-    if (!pricing) {
-      throw new UnprocessableEntityException('No active pricing policy found for this tenant');
-    }
 
-    // 6) Night/time-based multiplier from Tenant.settingsJson (Option A)
-    const multiplier = this.getNightTimeMultiplier(tenant.settingsJson, endedAt) ?? new Prisma.Decimal(1);
-
-    // 7) Decimal-safe math (schema: distance 10,3; duration 10,2; money 2dp). :contentReference[oaicite:1]{index=1}
+    // 6) Persist COMPLETED ride
     const dDistance = new Prisma.Decimal(dto.distanceKm).toDP(3);
     const dDuration = new Prisma.Decimal(durationMinutes).toDP(2);
 
-    const base = pricing.baseFare;
-    const distanceComponent = pricing.perKm.mul(dDistance);
-
-    const subtotalBeforeMult = base.add(distanceComponent);
-    const subtotal = subtotalBeforeMult.mul(multiplier).toDP(2);
-
-    const taxRate = new Prisma.Decimal(process.env.DEFAULT_TAX_RATE ?? '0.00');
-    const tax = subtotal.mul(taxRate).toDP(2);
-    const total = subtotal.add(tax).toDP(2);
-
-    // 8) Persist COMPLETED ride
     const updated = await this.prisma.ride.update({
       where: { id: ride.id },
       data: {
@@ -247,13 +387,24 @@ export class DriverRideService {
         status: RideStatus.COMPLETED,
       },
       select: {
-        id: true, status: true, tenantId: true, driverProfileId: true, pricingPolicyId: true,
-        startedAt: true, endedAt: true, durationMin: true, distanceKm: true,
-        fareSubtotal: true, taxAmount: true, fareTotal: true,
+        id: true,
+        status: true,
+        tenantId: true,
+        driverProfileId: true,
+        pricingMode: true,
+        pricingPolicyId: true,
+        fixedPricePolicyId: true,
+        startedAt: true,
+        endedAt: true,
+        durationMin: true,
+        distanceKm: true,
+        fareSubtotal: true,
+        taxAmount: true,
+        fareTotal: true,
       },
     });
-        
-    // Create payment record with status "PENDING" after the ride is successfully completed. 
+
+    // Create payment record with status "PENDING" after the ride is successfully completed.
     const paymentRecord = await this.prisma.payment.upsert({
       where: {
         rideId: updated.id,
@@ -275,17 +426,32 @@ export class DriverRideService {
         authorizedAt: null,
         capturedAt: null,
         failureCode: null,
-        externalPaymentId: null
+        externalPaymentId: null,
       },
     });
 
-
-
-    // 9) Build response with a friendly fare breakdown
+    // 7) Build response with fare breakdown
     const fare: FareBreakdownDto = {
-      base: this.money(base),
-      distanceComponent: this.money(distanceComponent),
-      surchargeMultiplier: multiplier.toString(),
+      pricingMode: ride.pricingMode,
+
+      // Mode-specific fields (only populated for relevant modes)
+      ...(ride.pricingMode === RidePricingMode.METER && {
+        base: this.money(fareData.base),
+        distanceComponent: this.money(fareData.distanceComponent),
+        timeComponent: this.money(fareData.timeComponent),
+        surchargeMultiplier: fareData.multiplier?.toString() || '1.00',
+      }),
+
+      ...(ride.pricingMode === RidePricingMode.FIXED_PRICE && {
+        fixedAmount: this.money(subtotal),
+        fixedPolicyName: fareData.policyName || 'Fixed Rate',
+      }),
+
+      ...(ride.pricingMode === RidePricingMode.CUSTOM_FIXED && {
+        customAmount: this.money(subtotal),
+      }),
+
+      // Common to all modes
       subtotal: this.money(subtotal),
       taxAmount: this.money(tax),
       total: this.money(total),
@@ -297,7 +463,9 @@ export class DriverRideService {
       status: updated.status,
       tenantId: updated.tenantId,
       driverProfileId: updated.driverProfileId,
-      pricingPolicyId: updated.pricingPolicyId!,
+      pricingMode: updated.pricingMode,
+      pricingPolicyId: updated.pricingPolicyId || undefined,
+      fixedPricePolicyId: updated.fixedPricePolicyId || undefined,
       startedAt: updated.startedAt.toISOString(),
       endedAt: updated.endedAt!.toISOString(),
       durationMinutes: Number(updated.durationMin),
@@ -308,15 +476,16 @@ export class DriverRideService {
       fare,
       paymentId: paymentRecord.id,
       paymentStatus: paymentRecord.status,
-      externalPaymentId: paymentRecord.externalPaymentId!
+      externalPaymentId: paymentRecord.externalPaymentId || undefined,
     };
 
     return res;
-
   }
 
- 
-  async getTodaysSummary(args: { userId: string; tenantId: string }): Promise<TodaysSummaryDto> {
+  async getTodaysSummary(args: {
+    userId: string;
+    tenantId: string;
+  }): Promise<TodaysSummaryDto> {
     const { userId, tenantId } = args;
 
     // get driver profile
@@ -324,7 +493,8 @@ export class DriverRideService {
       where: { userId, tenantId, status: 'ACTIVE' },
       select: { id: true },
     });
-    if (!driverProfile) throw new NotFoundException('Driver profile not found or inactive');
+    if (!driverProfile)
+      throw new NotFoundException('Driver profile not found or inactive');
 
     // get today's date range (start and end of day)
     const today = new Date();
@@ -339,24 +509,23 @@ export class DriverRideService {
         status: 'COMPLETED',
         startedAt: {
           gte: startOfDay,
-          lte: endOfDay
+          lte: endOfDay,
         },
         payment: {
-          status: 'PAID'
-        }
-        
+          status: 'PAID',
+        },
       },
       _count: { id: true },
-      _sum: { fareTotal: true, durationMin: true }
+      _sum: { fareTotal: true, durationMin: true },
     });
 
     const activeRide = await this.prisma.ride.findFirst({
       where: {
         driverProfileId: driverProfile.id,
         tenantId,
-        status: { in: ['DRAFT', 'ONGOING'] }
+        status: { in: ['DRAFT', 'ONGOING'] },
       },
-      select: { id: true }
+      select: { id: true },
     });
 
     const totalRides = todaysStats._count.id;
@@ -369,9 +538,11 @@ export class DriverRideService {
       totalEarnings,
       currency: 'EUR',
       hoursWorked: totalMinutes > 0 ? +(totalMinutes / 60).toFixed(1) : 0,
-      averageRideValue: totalRides > 0 ?
-        this.money(Number(totalEarnings) / totalRides) : '0.00',
-      activeRideId: activeRide?.id || null
+      averageRideValue:
+        totalRides > 0
+          ? this.money(Number(totalEarnings) / totalRides)
+          : '0.00',
+      activeRideId: activeRide?.id || null,
     };
   }
 
@@ -388,7 +559,8 @@ export class DriverRideService {
       where: { userId, tenantId, status: 'ACTIVE' },
       select: { id: true },
     });
-    if (!driverProfile) throw new NotFoundException('Driver profile not found or inactive');
+    if (!driverProfile)
+      throw new NotFoundException('Driver profile not found or inactive');
 
     // calculate date range based on filter
     const now = new Date();
@@ -405,7 +577,7 @@ export class DriverRideService {
         periodLabel = 'Last 30 Days';
         break;
       case 'all':
-        startDate = new Date("2025-01-01");
+        startDate = new Date('2025-01-01');
         periodLabel = 'All Time';
         break;
     }
@@ -420,7 +592,7 @@ export class DriverRideService {
           driverProfileId: driverProfile.id,
           tenantId,
           status: { in: ['COMPLETED', 'CANCELLED'] },
-          startedAt: { gte: startDate }
+          startedAt: { gte: startDate },
         },
         select: {
           id: true,
@@ -429,7 +601,7 @@ export class DriverRideService {
           durationMin: true,
           distanceKm: true,
           fareTotal: true,
-          status: true
+          status: true,
         },
         orderBy: { startedAt: 'desc' },
         skip: offset,
@@ -442,8 +614,8 @@ export class DriverRideService {
           driverProfileId: driverProfile.id,
           tenantId,
           status: { in: ['COMPLETED', 'CANCELLED'] },
-          startedAt: { gte: startDate }
-        }
+          startedAt: { gte: startDate },
+        },
       }),
 
       // summary statistics
@@ -452,33 +624,37 @@ export class DriverRideService {
           driverProfileId: driverProfile.id,
           tenantId,
           status: 'COMPLETED',
-          startedAt: { gte: startDate }
+          startedAt: { gte: startDate },
         },
-        _sum: { fareTotal: true, distanceKm: true }
-      })
+        _sum: { fareTotal: true, distanceKm: true },
+      }),
     ]);
-
 
     const paymentForRide = await this.prisma.payment.findMany({
       where: {
-        rideId: { in: rides.map(r => r.id) },
+        rideId: { in: rides.map((r) => r.id) },
       },
-      select: { id: true, status: true, rideId: true }
-    })
+      select: { id: true, status: true, rideId: true },
+    });
 
     // format rides for flatlist
-    const rideItems: RideHistoryItemDto[] = rides.map(ride => ({
+    const rideItems: RideHistoryItemDto[] = rides.map((ride) => ({
       id: ride.id,
       startedAt: ride.startedAt.toISOString(),
-      endedAt: ride.endedAt?.toISOString() || "",
-      duration: ride.durationMin ? `${Math.round(Number(ride.durationMin))} min` : '',
-      distance: ride.distanceKm ? `${Number(ride.distanceKm).toFixed(1)} km` : '',
+      endedAt: ride.endedAt?.toISOString() || '',
+      duration: ride.durationMin
+        ? `${Math.round(Number(ride.durationMin))} min`
+        : '',
+      distance: ride.distanceKm
+        ? `${Number(ride.distanceKm).toFixed(1)} km`
+        : '',
       earnings: this.money(ride.fareTotal || 0),
       status: ride.status,
       payment: {
-        id: paymentForRide.find(p => p.rideId === ride.id)?.id || '',
-        status: paymentForRide.find(p => p.rideId === ride.id)?.status || 'PENDING',
-      }
+        id: paymentForRide.find((p) => p.rideId === ride.id)?.id || '',
+        status:
+          paymentForRide.find((p) => p.rideId === ride.id)?.status || 'PENDING',
+      },
     }));
 
     const totalPages = Math.ceil(totalCount / limit);
@@ -494,11 +670,10 @@ export class DriverRideService {
       summary: {
         totalEarnings: this.money(summary._sum.fareTotal || 0),
         totalDistance: `${Number(summary._sum.distanceKm || 0).toFixed(1)} km`,
-        periodLabel
-      }
+        periodLabel,
+      },
     };
   }
-
 
   async getRideDetails(args: {
     userId: string;
@@ -512,15 +687,15 @@ export class DriverRideService {
       where: { userId, tenantId, status: 'ACTIVE' },
       select: { id: true },
     });
-    if (!driverProfile) throw new NotFoundException('Driver profile not found or inactive');
-
+    if (!driverProfile)
+      throw new NotFoundException('Driver profile not found or inactive');
 
     //get complete ride details
     const ride = await this.prisma.ride.findFirst({
       where: {
         id: rideId,
         driverProfileId: driverProfile.id,
-        tenantId
+        tenantId,
       },
       include: {
         payment: {
@@ -529,15 +704,15 @@ export class DriverRideService {
             status: true,
             provider: true,
             externalPaymentId: true,
-          }
+          },
         },
         pricing: {
           select: {
             baseFare: true,
             perKm: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
     if (!ride) throw new NotFoundException('Ride not found');
 
@@ -549,11 +724,28 @@ export class DriverRideService {
 
     // fare breakdown
     const fareBreakdown: FareBreakdownDto = {
-      base: this.money(ride.pricing?.baseFare || 0),
-      distanceComponent: this.money(
-        (ride.pricing?.perKm || new Prisma.Decimal(0)).mul(ride.distanceKm || 0)
-      ),
-      surchargeMultiplier: '1.00', // Placeholder, as we don't store multiplier per ride
+      pricingMode: ride.pricingMode,
+
+      // Mode-specific fields (only for METER mode in this context)
+      ...(ride.pricingMode === RidePricingMode.METER && {
+        base: this.money(ride.pricing?.baseFare || 0),
+        distanceComponent: this.money(
+          (ride.pricing?.perKm || new Prisma.Decimal(0)).mul(
+            ride.distanceKm || 0,
+          ),
+        ),
+        surchargeMultiplier: '1.00', // Placeholder, as we don't store multiplier per ride
+      }),
+
+      ...(ride.pricingMode === RidePricingMode.FIXED_PRICE && {
+        fixedAmount: this.money(ride.fareSubtotal || 0),
+        fixedPolicyName: 'Fixed Rate', // Could be enhanced to include actual policy name
+      }),
+
+      ...(ride.pricingMode === RidePricingMode.CUSTOM_FIXED && {
+        customAmount: this.money(ride.fareSubtotal || 0),
+      }),
+
       subtotal: this.money(ride.fareSubtotal || 0),
       taxAmount: this.money(ride.taxAmount || 0),
       total: this.money(ride.fareTotal || 0),
@@ -563,28 +755,166 @@ export class DriverRideService {
     return {
       id: ride.id,
       status: ride.status,
+      pricingMode: ride.pricingMode,
       timing: {
         startedAt: ride.startedAt.toISOString(),
-        endedAt: ride.endedAt?.toISOString() || "",
-        duration: durationText
+        endedAt: ride.endedAt?.toISOString() || '',
+        duration: durationText,
       },
       distance: {
         totalKm: Number(ride.distanceKm || 0).toFixed(3),
-        displayKm: `${Number(ride.distanceKm || 0).toFixed(1)} km`
+        displayKm: `${Number(ride.distanceKm || 0).toFixed(1)} km`,
       },
       fare: {
         subtotal: this.money(ride.fareSubtotal || 0),
         tax: this.money(ride.taxAmount || 0),
         total: this.money(ride.fareTotal || 0),
         currency: 'EUR',
-        breakdown: fareBreakdown
+        breakdown: fareBreakdown,
       },
-      payment: ride.payment ? {
-        id: ride.payment.id,
-        status: ride.payment.status,
-        method: ride.payment.provider,
-        externalId: ride.payment.externalPaymentId || undefined
-      } : undefined,
+      payment: ride.payment
+        ? {
+            id: ride.payment.id,
+            status: ride.payment.status,
+            method: ride.payment.provider,
+            externalId: ride.payment.externalPaymentId || undefined,
+          }
+        : undefined,
+    };
+  }
+
+  // ============== FARE CALCULATION METHODS ==============
+
+  private async calculateMeterFare(params: {
+    ride: any;
+    tenant: any;
+    endedAt: Date;
+    durationMinutes: number;
+    distanceKm: number;
+  }) {
+    const { ride, tenant, endedAt, durationMinutes, distanceKm } = params;
+
+    // Get pricing policy (current logic)
+    let pricing = ride.pricingPolicyId
+      ? await this.prisma.pricingPolicy.findUnique({
+          where: { id: ride.pricingPolicyId },
+          select: {
+            id: true,
+            baseFare: true,
+            perKm: true,
+            perMin: true,
+            name: true,
+          },
+        })
+      : null;
+
+    if (!pricing) {
+      pricing = await this.prisma.pricingPolicy.findFirst({
+        where: { tenantId: ride.tenantId, isActive: true },
+        select: {
+          id: true,
+          baseFare: true,
+          perKm: true,
+          perMin: true,
+          name: true,
+        },
+      });
+    }
+
+    if (!pricing) {
+      throw new UnprocessableEntityException(
+        'No active pricing policy found for this tenant',
+      );
+    }
+
+    // Night/time multiplier
+    const multiplier =
+      this.getNightTimeMultiplier(tenant.settingsJson, endedAt) ??
+      new Prisma.Decimal(1);
+    const dDistance = new Prisma.Decimal(distanceKm).toDP(3);
+    const dDuration = new Prisma.Decimal(durationMinutes).toDP(2);
+
+    const base = pricing.baseFare;
+    const distanceComponent = pricing.perKm.mul(dDistance);
+    const timeComponent = pricing.perMin.mul(dDuration);
+    const subtotalBeforeMult = base.add(distanceComponent).add(timeComponent);
+    const subtotal = subtotalBeforeMult.mul(multiplier).toDP(2);
+
+    const taxRate = new Prisma.Decimal(process.env.DEFAULT_TAX_RATE ?? '0.14');
+    const tax = subtotal.mul(taxRate).toDP(2);
+    const total = subtotal.add(tax).toDP(2);
+
+    return {
+      subtotal,
+      tax,
+      total,
+      base,
+      distanceComponent,
+      timeComponent,
+      multiplier,
+      policyName: pricing.name,
+    };
+  }
+
+  private async calculateFixedPriceFare(params: {
+    ride: any;
+    tenantId: string;
+  }) {
+    const { ride, tenantId } = params;
+
+    if (!ride.fixedPricePolicyId) {
+      throw new UnprocessableEntityException(
+        'Fixed price policy ID missing for FIXED_PRICE mode',
+      );
+    }
+
+    // Get the fixed price policy
+    const fixedPolicy = await this.prisma.fixedPricePolicy.findFirst({
+      where: {
+        id: ride.fixedPricePolicyId,
+        tenantId,
+        isActive: true,
+      },
+      select: { amount: true, name: true },
+    });
+
+    if (!fixedPolicy) {
+      throw new NotFoundException('Fixed price policy not found or inactive');
+    }
+
+    // Fixed price is the subtotal (before tax)
+    const subtotal = new Prisma.Decimal(fixedPolicy.amount);
+    const taxRate = new Prisma.Decimal(process.env.DEFAULT_TAX_RATE ?? '0.14');
+    const tax = subtotal.mul(taxRate).toDP(2);
+    const total = subtotal.add(tax).toDP(2);
+
+    return {
+      subtotal,
+      tax,
+      total,
+      policyName: fixedPolicy.name,
+    };
+  }
+
+  private calculateCustomFixedFare(params: { ride: any }) {
+    const { ride } = params;
+
+    if (!ride.customFixedFare) {
+      throw new UnprocessableEntityException(
+        'Custom fixed fare missing for CUSTOM_FIXED mode',
+      );
+    }
+
+    // Custom fare is the subtotal (before tax)
+    const subtotal = new Prisma.Decimal(ride.customFixedFare);
+    const taxRate = new Prisma.Decimal(process.env.DEFAULT_TAX_RATE ?? '0.14');
+    const tax = subtotal.mul(taxRate).toDP(2);
+    const total = subtotal.add(tax).toDP(2);
+
+    return {
+      subtotal,
+      tax,
+      total,
     };
   }
 }

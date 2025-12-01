@@ -7,7 +7,7 @@ import {
   ValidationPipe
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { UniversalV1Guard } from '../../auth/guards/universal-v1.guard';
 import { AdminRoleGuard } from '../guards/admin-role.guard';
 import { AdminRoles } from '../decorators/admin-role.decorator';
 import { AdminReportService } from '../services/admin-report.service';
@@ -21,7 +21,7 @@ import {
 
 
 @Controller('admin/reports')
-@UseGuards(JwtAuthGuard, AdminRoleGuard)
+@UseGuards(UniversalV1Guard, AdminRoleGuard)
 @AdminRoles('ADMIN', 'MANAGER')
 export class AdminReportController {
   constructor(

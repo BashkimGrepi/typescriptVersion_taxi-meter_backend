@@ -55,22 +55,29 @@ enum ExportArchiveType {
   full
 }
 
+enum RidePricingMode {
+  METER
+  FIXED_PRICE
+  CUSTOM_FIXED
+}
+
 model Tenant {
-  id            String            @id @default(uuid())
-  name          String
-  businessId    String // yTunnus
-  settingsJson  Json?
-  memberships   Membership[]
-  drivers       DriverProfile[]
-  pricing       PricingPolicy[]
-  rides         Ride[]
-  providerAccts ProviderAccount[]
-  invitations   Invitation[]
-  payments      Payment[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  deletedAt     DateTime?
-  oauthStates   OAuthState[]
+  id               String             @id @default(uuid())
+  name             String
+  businessId       String // yTunnus
+  settingsJson     Json?
+  memberships      Membership[]
+  drivers          DriverProfile[]
+  pricing          PricingPolicy[]
+  rides            Ride[]
+  providerAccts    ProviderAccount[]
+  invitations      Invitation[]
+  payments         Payment[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
+  oauthStates      OAuthState[]
+  FixedPricePolicy FixedPricePolicy[]
 
   @@index([businessId])
 }
@@ -131,8 +138,9 @@ model DriverProfile {
   rides       Ride[]
   invitations Invitation[] // invitations for this driver profile
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  FixedPricePolicy FixedPricePolicy[]
 
   @@index([tenantId])
   @@index([userId])
@@ -158,27 +166,50 @@ model PricingPolicy {
   @@index([tenantId, updatedAt])
 }
 
-model Ride {
-  id              String        @id @default(uuid())
-  tenantId        String // Every ride must belong to a tenant
-  driverProfileId String
-  pricingPolicyId String?
-  startedAt       DateTime
-  endedAt         DateTime?
-  durationMin     Decimal?      @db.Decimal(10, 2)
-  distanceKm      Decimal?      @db.Decimal(10, 3)
-  fareSubtotal    Decimal?      @db.Decimal(10, 2)
-  taxAmount       Decimal?      @db.Decimal(10, 2)
-  fareTotal       Decimal?      @db.Decimal(10, 2)
-  status          RideStatus
-  payment         Payment?
-  links           PaymentLink[]
-
-  webhookEvents WebhookEvent[]
+model FixedPricePolicy {
+  id              String   @id @default(uuid())
+  tenantId        String
+  driverProfileId String? // null = tenant-wide tariff; not null = personal
+  name            String // e.g. "Airport flat rate"
+  amount          Decimal  @db.Decimal(10, 2) // total price incl. VAT
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  createdByUserId String?
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  driverProfile DriverProfile  @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
-  pricing       PricingPolicy? @relation(fields: [pricingPolicyId], references: [id], onDelete: SetNull)
+  driverProfile DriverProfile? @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+
+  rides Ride[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, driverProfileId])
+}
+
+model Ride {
+  id                 String          @id @default(uuid())
+  tenantId           String // Every ride must belong to a tenant
+  driverProfileId    String
+  pricingPolicyId    String?
+  startedAt          DateTime
+  endedAt            DateTime?
+  durationMin        Decimal?        @db.Decimal(10, 2)
+  distanceKm         Decimal?        @db.Decimal(10, 3)
+  fareSubtotal       Decimal?        @db.Decimal(10, 2)
+  taxAmount          Decimal?        @db.Decimal(10, 2)
+  fareTotal          Decimal?        @db.Decimal(10, 2)
+  status             RideStatus
+  pricingMode        RidePricingMode @default(METER)
+  fixedPricePolicyId String? // for FIXED_POLICY
+  customFixedFare    Decimal?        @db.Decimal(10, 2) // for  CUSTOM_FIXED
+
+  payment       Payment?
+  links         PaymentLink[]
+  webhookEvents WebhookEvent[]
+
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  driverProfile DriverProfile     @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  pricing       PricingPolicy?    @relation(fields: [pricingPolicyId], references: [id], onDelete: SetNull)
+  fixed         FixedPricePolicy? @relation(fields: [fixedPricePolicyId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, status])
   @@index([driverProfileId])
@@ -285,7 +316,7 @@ model WebhookEvent {
   attemptCount Int             @default(0)
   paymentId    String?
   rideId       String?
-  errorMessage  String?
+  errorMessage String?
 
   ride    Ride?    @relation(fields: [rideId], references: [id], onDelete: SetNull)
   payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)

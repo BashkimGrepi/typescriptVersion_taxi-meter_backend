@@ -153,6 +153,25 @@ async function main() {
   });
   console.log('✅ Created pricing policy:', tamperStandardPricing.name);
 
+  // Create Fixed Price Policies
+  const airportFixedPrice = await prisma.fixedPricePolicy.create({
+    data: {
+      tenantId: helsinkiTenant.id,
+      driverProfileId: null, // tenant-wide policy
+      name: 'Airport Flat Rate',
+      amount: 45.0,
+      isActive: true,
+      createdByUserId: adminUser.id,
+    },
+  });
+  console.log(
+    '✅ Created fixed price policy:',
+    airportFixedPrice.name,
+    `€${airportFixedPrice.amount}`,
+  );
+
+  
+
   // Create a completed ride with Viva payment
   const rideStartTime = new Date('2025-11-18T10:30:00Z');
   const rideEndTime = new Date('2025-11-18T10:48:00Z');
@@ -221,6 +240,11 @@ async function main() {
   console.log(
     `- Tampere Active: ${tamperStandardPricing.name} (€${tamperStandardPricing.baseFare} + €${tamperStandardPricing.perKm}/km)`,
   );
+  console.log(`- Fixed Price Policies: 2 (1 tenant-wide, 1 personal)`);
+  console.log(
+    `  - Tenant-wide: ${airportFixedPrice.name} (€${airportFixedPrice.amount})`,
+  );
+
   console.log(`- Memberships: 3 (admin in 2 tenants, driver in 1 tenant)`);
   console.log(
     `- Sample Ride: ${sampleRide.distanceKm}km, ${sampleRide.durationMin}min, €${sampleRide.fareTotal}`,

@@ -12,7 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { DriverRideService } from '../services/driver-ride.service';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { UniversalV1Guard } from 'src/auth/guards/universal-v1.guard';
 import { StartRideDto } from '../dto/StartRideDto';
 import { StartRideResponseDto } from '../dto/StartRideResponseDto';
 import { EndRideDto, EndRideResponseDto } from '../dto/EndRideDto';
@@ -20,7 +20,7 @@ import * as RideHistoryDto from '../dto/RideHistoryDto';
 
 @Injectable()
 @Controller('driver/rides')
-@UseGuards(JwtAuthGuard) // protects route and contains jwt authentication
+@UseGuards(UniversalV1Guard) // protects route and contains jwt authentication
 export class DriverRideController {
   constructor(private rideService: DriverRideService) {}
 

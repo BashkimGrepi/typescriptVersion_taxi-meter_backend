@@ -1,7 +1,7 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
-import { JwtGlobalGuard } from './auth/guards/jwt-global.guard';
+import { UniversalV1Guard } from './auth/guards/universal-v1.guard';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
@@ -42,7 +42,7 @@ async function bootstrap() {
   await prismaService.enableShutdownHooks(app);
 
   const reflector = app.get(Reflector);
-  app.useGlobalGuards(new JwtGlobalGuard(reflector)); // applies JWT protection to entire application
+  app.useGlobalGuards(new UniversalV1Guard(reflector)); // applies JWT protection to entire application
 
   // Enable global validation with transformation
   app.useGlobalPipes(new ValidationPipe({

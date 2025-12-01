@@ -1,9 +1,9 @@
 import { BadRequestException, Controller, Get, Header, Query, Req, Res, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { UniversalV1Guard } from 'src/auth/guards/universal-v1.guard';
 import { SnapshotService } from './snapshot.service';
 import { PdfService } from './pdf/pdf.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(UniversalV1Guard)
 @Controller('admin/exports')
 export class ExportsPreviewController {
   constructor(

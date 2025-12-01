@@ -14,7 +14,7 @@ import { RegisterDto } from './dto/admin/register.dto';
 import { LoginDto as DriverLoginDto } from './dto/driver/login.dto';
 import { ConfigService } from '@nestjs/config';
 import { JwtRevocationService } from './services/jwt-revocation.service';
-import { DriverAccessJwtPayloadV1 } from './interfaces/jwt-payload.interface';
+import { UnifiedJwtPayload } from './interfaces/jwt-payload.interface';
 import { JWT_CONSTANTS } from './constants/jwt.constants';
 import { v4 as uuid } from 'uuid';
 
@@ -29,10 +29,13 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
-  private async generateDriverAccessTokenV1(
+  private async generateUnifiedAccessToken(
     userId: string,
+    email: string,
+    role: 'ADMIN' | 'MANAGER' | 'DRIVER',
     tenantId: string,
-    driverProfileId: string,
+    tenantName: string,
+    driverProfileId?: string,
   ): Promise<{ access_token: string; expires_in: number; jti: string }> {
     try {
       const iat = Math.floor(Date.now() / 1000);
@@ -41,21 +44,23 @@ export class AuthService {
       const jti = uuid();
 
       this.logger.log(
-        `Generating JWT v1 token - userId: ${userId}, tenantId: ${tenantId}, driverProfileId: ${driverProfileId}, ttl: ${ttl}s`,
+        `Generating unified JWT token - userId: ${userId}, role: ${role}, tenantId: ${tenantId}${driverProfileId ? `, driverProfileId: ${driverProfileId}` : ''}, ttl: ${ttl}s`,
       );
 
-      const payload: DriverAccessJwtPayloadV1 = {
+      const payload: UnifiedJwtPayload = {
         sub: userId,
-        tenantId,
-        driverProfileId,
-        role: JWT_CONSTANTS.DRIVER_ROLE,
-        type: JWT_CONSTANTS.ACCESS_TYPE,
+        email: email,
+        tenantId: tenantId,
+        tenantName: tenantName,
+        role: role,
+        type: 'access',
         aud: this.config.get('JWT_AUDIENCE') || 'api',
         iss: this.config.get('JWT_ISSUER') || 'taxi-meter-api',
         iat,
         exp,
         jti,
-        ver: JWT_CONSTANTS.VERSION,
+        ver: 1,
+        ...(driverProfileId && { driverProfileId }),
       };
 
       // Use native jsonwebtoken to avoid NestJS global signOptions conflicts
@@ -70,18 +75,20 @@ export class AuthService {
       });
 
       this.logger.log(
-        `JWT v1 token generated successfully - jti: ${jti}, expires: ${new Date(exp * 1000).toISOString()}`,
+        `Unified JWT token generated successfully - jti: ${jti}, role: ${role}, expires: ${new Date(exp * 1000).toISOString()}`,
       );
 
       return { access_token, expires_in: ttl, jti };
     } catch (error) {
       this.logger.error(
-        `Failed to generate JWT v1 token for userId: ${userId}, tenantId: ${tenantId}, driverProfileId: ${driverProfileId}`,
+        `Failed to generate unified JWT token for userId: ${userId}, role: ${role}, tenantId: ${tenantId}`,
         error.stack,
       );
       throw error;
     }
   }
+
+  
 
   async loginDriverV1(dto: DriverLoginDto) {
     try {
@@ -176,12 +183,14 @@ export class AuthService {
 
       // Generate JWT v1 access token
       const { access_token, expires_in } =
-        await this.generateDriverAccessTokenV1(
+        await this.generateUnifiedAccessToken(
           user.id,
+          user.email,
+          'DRIVER',
           profile.tenantId,
+          profile.tenant.name,
           profile.id,
         );
-
       this.logger.log(
         `Generated JWT v1 token for user: ${user.id}, profile: ${profile.id}, tenant: ${profile.tenantId}`,
       );
@@ -258,20 +267,18 @@ export class AuthService {
         `Profile found: ${profile.id} for user: ${decoded.sub} in tenant: ${dto.tenantId}`,
       );
 
-      // Generate JWT v1 access token
-      const { access_token, expires_in } =
-        await this.generateDriverAccessTokenV1(
-          profile.user!.id,
-          profile.tenantId,
-          profile.id,
-        );
-
-      this.logger.log(
-        `Generated JWT v1 token for selectTenant - user: ${profile.user!.id}, profile: ${profile.id}, tenant: ${profile.tenantId}`,
-      );
+     const { access_token: accessToken, expires_in } =
+       await this.generateUnifiedAccessToken(
+         profile.user!.id,
+         profile.user!.email,
+         'DRIVER',
+         profile.tenantId,
+         profile.tenant.name,
+         profile.id,
+       );
 
       return {
-        access_token,
+        access_token: accessToken,
         token_type: JWT_CONSTANTS.TOKEN_TYPE,
         expires_in,
       };
@@ -388,123 +395,22 @@ export class AuthService {
       throw new ForbiddenException('User does not have access to this tenant');
 
     // CHANGED: final access token has type:'access' and uses consistent JWT_SECRET
-    const accessToken = await this.jwtService.signAsync(
-      {
-        sub: user.id,
-        email: user.email,
-        role: mem.role, // e.g. 'ADMIN'
-        tenantId: chosenTenantId,
-        tenantName: mem.tenant.name, // optional, handy for UI
-        type: 'access',
-      },
-      {
-        secret: this.config.get('JWT_SECRET'),
-        expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '3600s',
-        audience: 'api',
-      },
-    );
-
-    return {
-      access_token: accessToken,
-      token_type: 'Bearer',
-      expires_in: this.config.get('JWT_EXPIRES_IN'),
-    };
-  }
-
-  /**
-   * DRIVER login — returns a tenant-scoped driver token.
-   * If the driver has profiles in multiple tenants and no tenant is specified,
-   * returns a selection list (with loginTicket) instead of a token.
-   */
-  async loginDriver(dto: DriverLoginDto) {
-    const user = await this.validateUser(dto.email, dto.password);
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-
-    // Active driver profiles for this user
-    const profiles = await this.prisma.driverProfile.findMany({
-      where: { userId: user.id, status: 'ACTIVE' },
-
-      select: {
-        id: true,
-        tenantId: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        email: true,
-        status: true,
-        tenant: { select: { name: true } },
-      },
-    });
-
-    if (profiles.length === 0) {
-      throw new UnauthorizedException('Driver profile not found or inactive');
-    }
-
-    // Choose tenant/profile
-    const requestedTenantId = (dto as any).tenantId as string | undefined; // add tenantId?: string to your DriverLoginDto if you haven't yet
-    let profile = profiles[0];
-
-    if (requestedTenantId) {
-      const match = profiles.find((p) => p.tenantId === requestedTenantId);
-      if (!match)
-        throw new ForbiddenException('Not a driver in the selected tenant');
-      profile = match;
-    } else if (profiles.length > 1) {
-      // Multiple tenants: ask client to choose
-      // NEW: include loginTicket
-      const loginTicket = await this.jwtService.signAsync(
-        { sub: user.id, purpose: 'tenant_selection' },
-        {
-          secret: this.config.get('JWT_TICKET_SECRET'),
-          expiresIn: this.config.get('JWT_TICKET_EXPIRES') ?? '300s',
-          audience: 'tenant-selection',
-        },
+    const { access_token: accessToken, expires_in } =
+      await this.generateUnifiedAccessToken(
+        user.id,
+        user.email,
+        mem.role as 'ADMIN' | 'MANAGER',
+        chosenTenantId,
+        mem.tenant.name,
       );
 
-      return {
-        requiresTenantSelection: true,
-        tenants: profiles.map((p) => ({
-          tenantId: p.tenantId,
-          tenantName: p.tenant.name,
-        })),
-        loginTicket,
-      };
-    }
-
-    // CHANGED: final access token has type:'access' and uses consistent JWT_SECRET
-    const accessToken = await this.jwtService.signAsync(
-      {
-        sub: user.id,
-        email: user.email,
-        type: 'access', // important for strategy to accept
-        driverProfileId: profile.id,
-        tenantId: profile.tenantId,
-        role: 'DRIVER',
-      },
-      {
-        secret: this.config.get('JWT_SECRET'),
-        expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '3600s',
-        audience: 'api',
-      },
-    );
-
     return {
       access_token: accessToken,
-      token_type: 'Bearer',
-      expires_in: this.config.get('JWT_EXPIRES_IN'),
-      driver: {
-        id: profile.id,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        phone: profile.phone,
-        email: profile.email,
-        status: profile.status,
-        role: 'DRIVER',
-        tenantId: profile.tenantId,
-        tenantName: profile.tenant.name,
-      },
+      token_type: JWT_CONSTANTS.TOKEN_TYPE,
+      expires_in,
     };
   }
+
 
   /**
    * EXCHANGE (Step 2) — ADMIN/MANAGER:
@@ -533,22 +439,14 @@ export class AuthService {
     if (!membership)
       throw new ForbiddenException('Not a member of this tenant');
 
-    // Final access token (consistent JWT_SECRET)
-    const accessToken = await this.jwtService.signAsync(
-      {
-        sub: membership.user.id,
-        email: membership.user.email,
-        role: membership.role,
-        tenantId: membership.tenantId,
-        tenantName: membership.tenant.name,
-        type: 'access',
-      },
-      {
-        secret: this.config.get('JWT_SECRET'),
-        expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '3600s',
-        audience: 'api',
-      },
-    );
+    const { access_token: accessToken, expires_in } =
+      await this.generateUnifiedAccessToken(
+        membership.user.id,
+        membership.user.email,
+        membership.role as 'ADMIN' | 'MANAGER',
+        membership.tenantId,
+        membership.tenant.name,
+      );
 
     return {
       access_token: accessToken,
@@ -560,72 +458,7 @@ export class AuthService {
     };
   }
 
-  /**
-   * EXCHANGE (Step 2) — DRIVER:
-   * Accepts { loginTicket, tenantId } and returns the final driver access token.
-   */
-  async selectTenantDriver(dto: { loginTicket: string; tenantId: string }) {
-    // Verify ticket with TICKET secret + audience
-    const decoded = await this.jwtService.verifyAsync(dto.loginTicket, {
-      secret: this.config.get('JWT_TICKET_SECRET'),
-      audience: 'tenant-selection',
-    });
-    if (decoded?.purpose !== 'tenant_selection') {
-      throw new UnauthorizedException('Invalid ticket purpose');
-    }
-
-    // Fresh driver profile check
-    const profile = await this.prisma.driverProfile.findFirst({
-      where: { userId: decoded.sub, tenantId: dto.tenantId, status: 'ACTIVE' },
-      select: {
-        id: true,
-        tenantId: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        email: true,
-        status: true,
-        tenant: { select: { name: true } },
-        user: { select: { id: true, email: true } },
-      },
-    });
-    if (!profile)
-      throw new ForbiddenException('Not a driver in the selected tenant');
-
-    // Final access token (consistent JWT_SECRET)
-    const accessToken = await this.jwtService.signAsync(
-      {
-        sub: profile.user!.id,
-        email: profile.user!.email,
-        type: 'access',
-        driverProfileId: profile.id,
-        tenantId: profile.tenantId,
-        role: 'DRIVER',
-      },
-      {
-        secret: this.config.get('JWT_SECRET'),
-        expiresIn: this.config.get('JWT_EXPIRES_IN') ?? '3600s',
-        audience: 'api',
-      },
-    );
-
-    return {
-      access_token: accessToken,
-      token_type: 'Bearer',
-      expires_in: this.config.get('JWT_EXPIRES_IN'),
-      driver: {
-        id: profile.id,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        phone: profile.phone,
-        email: profile.email,
-        status: profile.status,
-        role: 'DRIVER',
-        tenantId: profile.tenantId,
-        tenantName: profile.tenant.name,
-      },
-    };
-  }
+ 
 
   /**
    * User self-register — creates a tenant and an ADMIN membership,

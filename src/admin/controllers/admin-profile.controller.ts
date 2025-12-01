@@ -1,5 +1,5 @@
 import { Controller, Get, UseGuards } from "@nestjs/common";
-import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
+import { UniversalV1Guard } from "../../auth/guards/universal-v1.guard";
 import { AdminRoleGuard } from "../guards/admin-role.guard";
 import { AdminProfileService } from "../services/admin-profile.service";
 import { AdminRoles } from "../decorators/admin-role.decorator";
@@ -8,7 +8,7 @@ import { AdminProfileResponseDto } from "../dto/admin-profile-response.dto";
 
 
 @Controller('admin/profile')
-@UseGuards(JwtAuthGuard, AdminRoleGuard)
+@UseGuards(UniversalV1Guard, AdminRoleGuard)
 @AdminRoles('ADMIN', 'MANAGER') 
 export class AdminProfileController {
     constructor(private readonly profileService: AdminProfileService) { }

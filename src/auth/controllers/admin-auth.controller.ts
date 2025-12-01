@@ -2,10 +2,8 @@ import { Controller, Post, Body, UseGuards, Get, Request, Req } from '@nestjs/co
 import { AuthService } from '../auth.service';
 import { LoginDto } from '../dto/admin/login.dto';
 import { RegisterDto } from '../dto/admin/register.dto';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from 'src/decorators/public.decorator';
 import { UserResponseDto } from '../dto/common/user-response.dto';
-import { SelectTenantDto } from '../dto/admin/select-tenant.dto';
 
 @Controller('auth/admin')
 export class AdminAuthController {
@@ -40,4 +38,7 @@ export class AdminAuthController {
       tenantId: dto.tenantId,
     });
   }
+
+
+  // logout endpoint to revoke tokens
 }

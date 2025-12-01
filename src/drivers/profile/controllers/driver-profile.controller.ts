@@ -1,10 +1,10 @@
-import { 
-  Controller, 
-  Get, 
-  Put, 
-  Body, 
+import {
+  Controller,
+  Get,
+  Put,
+  Body,
   UseGuards,
-  ValidationPipe
+  ValidationPipe,
 } from '@nestjs/common';
 
 import { DriverProfileService } from '../services/driver-profile.service';
@@ -12,23 +12,25 @@ import { Driver } from '../../../decorators/driver.decorator';
 import type { DriverInfo } from '../../../decorators/driver.decorator';
 import { UpdateDriverProfileDto } from '../../dto/update-driver-profile.dto';
 import { DriverProfileResponseDto } from '../../dto/driver-profile-response.dto';
-import { DriverV1Guard } from 'src/auth/guards/driver-v1.guard';
+import { UniversalV1Guard } from 'src/auth/guards/universal-v1.guard';
 
 @Controller('/driver')
-@UseGuards(DriverV1Guard)
+@UseGuards(UniversalV1Guard)
 export class DriverProfileController {
   constructor(private driverProfileService: DriverProfileService) {}
 
   @Get('profile')
-  async getProfile(@Driver() driver: DriverInfo): Promise<DriverProfileResponseDto> {
+  async getProfile(
+    @Driver() driver: DriverInfo,
+  ): Promise<DriverProfileResponseDto> {
     return this.driverProfileService.getDriverProfile(driver);
   }
 
   @Put('profile/edit')
   async updateProfile(
     @Driver() driver: DriverInfo,
-    @Body(new ValidationPipe({ transform: true, whitelist: true })) 
-    updateData: UpdateDriverProfileDto
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    updateData: UpdateDriverProfileDto,
   ): Promise<DriverProfileResponseDto> {
     return this.driverProfileService.updateDriverProfile(driver, updateData);
   }

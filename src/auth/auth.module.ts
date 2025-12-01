@@ -4,13 +4,12 @@ import { AdminAuthController } from './controllers/admin-auth.controller';
 import { DriverAuthController } from './controllers/driver-auth.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { PassportModule } from '@nestjs/passport';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { JwtV1Strategy } from './strategies/jwt-v1-strategy';
 import { JwtRevocationService } from './services/jwt-revocation.service';
-import { DriverV1Guard } from './guards/driver-v1.guard';
+import { UniversalV1Guard } from './guards/universal-v1.guard';
 
 // JWT Configuration
 
@@ -33,12 +32,11 @@ import { DriverV1Guard } from './guards/driver-v1.guard';
   controllers: [AdminAuthController, DriverAuthController],
   providers: [
     AuthService,
-    JwtStrategy,
-    LocalStrategy,
     JwtV1Strategy,
+    LocalStrategy,
     JwtRevocationService,
-    DriverV1Guard,
+    UniversalV1Guard, 
   ],
-  exports: [AuthService, JwtRevocationService, DriverV1Guard], // Export services for use in other modules
+  exports: [AuthService, JwtRevocationService], // Export services for use in other modules
 })
 export class AuthModule {}
