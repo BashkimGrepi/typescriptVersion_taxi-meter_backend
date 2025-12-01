@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
-import { JwtAuthGuard } from "src/auth/guards/jwt-auth.guard";
+import { UniversalV1Guard } from "src/auth/guards/universal-v1.guard";
 import { PricingService } from "./pricing.service";
 import ListPricingPoliciesDto, { CreatePricingPolicyDto, UpdatePricingPolicyDto } from "./dto/pricing-policies.dto";
 import { AdminOrManager, type AdminOrManagerInfo } from "src/decorators/admin-or-manager.decorator";
@@ -7,10 +7,12 @@ import { Admin, type AdminInfo } from "src/decorators/admin.decorator";
 import { Driver, type DriverInfo } from "src/decorators/driver.decorator";
 import { AuthenticatedUser, type AuthenticatedUserInfo } from "src/decorators/authenticated-user-decorator";
 import { use } from "passport";
+import * as FixedPricePolicyDto from "src/pricings/dto/FixedPricePolicyDto";
+import * as CustomPricingPolicy from "./dto/CustomPricingPolicy";
 
 
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(UniversalV1Guard)
 @Controller('pricing-policies')
 export class PricingController {
     constructor(
@@ -18,6 +20,8 @@ export class PricingController {
     ) { }
     
     //list all policies - Admin & Manager can see all policies
+    // ------- METER  --------
+
     @Get()
     async listPolicies(@AuthenticatedUser() user: AuthenticatedUserInfo, @Query() dto: ListPricingPoliciesDto) {
         return this.pricingService.list(user.tenantId, dto);
@@ -58,5 +62,45 @@ export class PricingController {
         return this.pricingService.getActive(user.tenantId);
     }
 
+    // --------- FIXED PRICE ----------
+    // secure endpoints more for admin only and tighten the security
+    @Post("/fixed/create/admin")
+    async createFixedByAdmin(@AdminOrManager() user: AdminOrManagerInfo, @Body() dto: FixedPricePolicyDto.CreateFixedPricePolicyDto) {
+        return this.pricingService.createFixedByAdmin(user.tenantId, dto);
+    }
 
+    @Get("/fixed")
+    async listFixedPolicies(@AuthenticatedUser() user: AuthenticatedUserInfo ) {
+        return this.pricingService.listFixedPolicies(user.tenantId, user.userId);
+    }
+
+    //@Post("/custom-fixed/driver")
+    //async createCustomFixedByDriver(@Driver() driver: DriverInfo, @Body() dto: CustomPricingPolicy.CreateCustomFixedPolicyDto) {
+      //  return this.pricingService.createCustomFixedByDriver(driver.tenantId, driver.driverProfileId, dto);
+    //}
+
+
+
+    // All policies
+    @Get("all")
+    async allPolicies(@AuthenticatedUser() user: AuthenticatedUserInfo) {
+        const args = {
+            tenantId: user.tenantId,
+            userId: user.userId,
+            userRole: user.role,
+        };
+        return this.pricingService.listAllPolicies(args);
+    }
+
+    @Get("available-ride")
+    async availablePoliciesForRide(@Req() req: any) {
+        const args = {
+            tenantId: req.user.tenantId,
+            userId: req.user.userId,
+            userRole: req.user.role,
+            driverProfileId: req.user.driverProfileId,
+        };
+        return this.pricingService.listAvailablePoliciesForRide(args);
+    }
+    
 }
