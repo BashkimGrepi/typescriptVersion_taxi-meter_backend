@@ -1,13 +1,18 @@
-import { Module } from "@nestjs/common";
-import { ReportsService } from "./reports.service";
-import { ReportsController } from "./reports.controller";
-import { PrismaModule } from "src/prisma/prisma.module";
-
+import { Module, Scope } from '@nestjs/common';
+import { ReportsService } from './reports.service';
+import { ReportsController } from './reports.controller';
+import { PrismaModule } from 'src/prisma/prisma.module';
 
 @Module({
-    imports: [PrismaModule],
-    controllers: [ReportsController],
-    providers: [ReportsService],
-    exports: [ReportsService],
+  imports: [PrismaModule],
+  controllers: [ReportsController],
+  providers: [
+    {
+      provide: ReportsService,
+      useClass: ReportsService,
+      scope: Scope.REQUEST,
+    },
+  ],
+  exports: [ReportsService],
 })
 export class ReportsModule {}

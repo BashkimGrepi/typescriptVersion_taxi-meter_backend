@@ -14,7 +14,7 @@ import {
 import { DriverRideService } from '../services/driver-ride.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { StartRideDto } from '../dto/StartRideDto';
-import { StartRideResponseDto } from '../dto/StartRideResponseDto';
+import { StartRideResponseDtoNew } from '../dto/StartRideResponseDto';
 import { EndRideDto, EndRideResponseDto } from '../dto/EndRideDto';
 import * as RideHistoryDto from '../dto/RideHistoryDto';
 
@@ -28,16 +28,12 @@ export class DriverRideController {
   async startRide(
     @Body() dto: StartRideDto,
     @Req() req,
-  ): Promise<StartRideResponseDto> {
-    const userId = req.user.sub;
-    const tenantId = req.user.tenantId;
-    console.log('req.user = ', req.user);
-
+): Promise<StartRideResponseDtoNew> {
     if (req.user.role !== 'DRIVER') {
       throw new ForbiddenException('Only drivers can start rides');
     }
 
-    return this.rideService.startRide({ dto, userId, tenantId });
+    return this.rideService.startRide({ dto });
   }
 
   @Post('end')
@@ -45,22 +41,16 @@ export class DriverRideController {
     @Body() dto: EndRideDto,
     @Req() req,
   ): Promise<EndRideResponseDto> {
-    const userId = req.user.sub;
-    const tenantId = req.user.tenantId;
-
     if (req.user.role !== 'DRIVER') {
       throw new ForbiddenException('Only drivers can end rides');
     }
 
-    return this.rideService.endRide({ dto, userId, tenantId });
+    return this.rideService.endRide({ dto });
   }
 
   @Get('today-summary')
   async getTodaysSummary(@Request() req: any) {
-    return this.rideService.getTodaysSummary({
-      userId: req.user.sub,
-      tenantId: req.user.tenantId,
-    });
+    return this.rideService.getTodaysSummary();
   }
 
   @Get('history')
@@ -69,8 +59,6 @@ export class DriverRideController {
     @Query() query: RideHistoryDto.RideHistoryRequestDto,
   ) {
     return this.rideService.getRideHistory({
-      userId: req.user.sub,
-      tenantId: req.user.tenantId,
       dto: {
         timeFilter: query.timeFilter || 'week',
         page: query.page ? parseInt(query.page.toString()) : 1,
@@ -81,10 +69,6 @@ export class DriverRideController {
 
   @Get(':rideId/details')
   async getRideDetails(@Request() req: any, @Param('rideId') rideId: string) {
-    return this.rideService.getRideDetails({
-      userId: req.user.sub,
-      tenantId: req.user.tenantId,
-      rideId,
-    });
+    return this.rideService.getRideDetails({rideId});
   }
 }

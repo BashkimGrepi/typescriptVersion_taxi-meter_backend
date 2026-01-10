@@ -4,12 +4,18 @@ import { PrismaService } from './prisma/prisma.service';
 import { JwtGlobalGuard } from './auth/guards/jwt-global.guard';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { TenantScopedGuard } from './common/guards/tenant-scoped.guard';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
-  
+
+  const reflector = app.get(Reflector);
+  app.useGlobalGuards(
+    new JwtGlobalGuard(reflector),
+    new TenantScopedGuard(reflector),
+  )
 
   app.enableCors({
     origin: ['http://localhost:5173'], // admin dashboard
@@ -41,9 +47,7 @@ async function bootstrap() {
   const prismaService = app.get(PrismaService);
   await prismaService.enableShutdownHooks(app);
 
-  const reflector = app.get(Reflector);
-  app.useGlobalGuards(new JwtGlobalGuard(reflector)); // applies JWT protection to entire application
-
+  
   // Enable global validation with transformation
   app.useGlobalPipes(new ValidationPipe({
     transform: true, // Automatically transform payloads to DTO instances

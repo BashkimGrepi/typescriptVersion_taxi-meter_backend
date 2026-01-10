@@ -1,21 +1,45 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
-import { PrismaService } from "src/prisma/prisma.service";
-import { StartRideDto } from "../dto/StartRideDto";
-import { StartRideResponseDto } from "../dto/StartRideResponseDto";
-import { Prisma, RideStatus, Ride, PaymentProvider, PaymentStatus } from "@prisma/client";
-import { EndRideDto, EndRideResponseDto, FareBreakdownDto } from "../dto/EndRideDto";
-import { TodaysSummaryDto } from "../dto/TodaysSummary";
-import { RideHistoryItemDto, RideHistoryRequestDto, RideHistoryResponseDto } from "../dto/RideHistoryDto";
-import { RideDetailsDto } from "../dto/RideDetailsDto";
-
-
-
+import { REQUEST } from '@nestjs/core';
+import express from 'express';
+import { TenantScopedService } from '../../../common/services/tenant-scoped.service';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { StartRideDto } from '../dto/StartRideDto';
+import { StartRideResponseDtoNew } from '../dto/StartRideResponseDto';
+import {
+  Prisma,
+  RideStatus,
+  Ride,
+  PaymentProvider,
+  PaymentStatus,
+} from '@prisma/client';
+import {
+  EndRideDto,
+  EndRideResponseDto,
+  FareBreakdownDto,
+} from '../dto/EndRideDto';
+import { TodaysSummaryDto } from '../dto/TodaysSummary';
+import {
+  RideHistoryItemDto,
+  RideHistoryRequestDto,
+  RideHistoryResponseDto,
+} from '../dto/RideHistoryDto';
+import { RideDetailsDto } from '../dto/RideDetailsDto';
 
 @Injectable()
-export class DriverRideService {
-    
-  constructor(private prisma: PrismaService) { }
-
+export class DriverRideService extends TenantScopedService {
+  constructor(
+    @Inject(PrismaService) private prisma: PrismaService,
+    @Inject(REQUEST) request: express.Request,
+  ) {
+    super(request);
+  }
 
   /** Format Prisma.Decimal or number to a 2-dp string for money */
   private money(v: Prisma.Decimal | number | null | undefined): string {
@@ -25,7 +49,10 @@ export class DriverRideService {
   }
 
   /** Option A: read night surcharge windows from Tenant.settingsJson */
-  private getNightTimeMultiplier(settings: any, at: Date): Prisma.Decimal | null {
+  private getNightTimeMultiplier(
+    settings: any,
+    at: Date,
+  ): Prisma.Decimal | null {
     try {
       if (!settings || !Array.isArray(settings.surcharges)) return null;
 
@@ -58,28 +85,35 @@ export class DriverRideService {
     return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
   }
 
-
-
   // Mapping function to convert Ride to StartRideResponseDto
-  private mapRideToStartRideResponseDto(ride: Ride): StartRideResponseDto {
+  private mapRideToStartRideResponseDto(
+    ride: any,
+    pricingPolicy?: any,
+  ): StartRideResponseDtoNew {
+    const pricing = ride.pricing || pricingPolicy;
+
     return {
       rideId: ride.id,
       status: ride.status,
       startedAt: ride.startedAt,
-      pricingPolicyId: ride.pricingPolicyId,
       driverProfileId: ride.driverProfileId,
       tenantId: ride.tenantId,
-      durationMin: ride.durationMin,
-      distanceKm: ride.distanceKm,
-      fareSubtotal: ride.fareSubtotal,
-      taxAmount: ride.taxAmount,
-      fareTotal: ride.fareTotal
+      pricingPolicyId: ride.pricingPolicyId,
+      pricing: {
+        baseFare: pricing?.baseFare || new Prisma.Decimal(0),
+        perKm: pricing?.perKm || new Prisma.Decimal(0),
+        perMin: pricing?.perMin || new Prisma.Decimal(0),
+      },
     };
   }
 
   // start Ride -> for mobile application
-  async startRide(args: { dto: StartRideDto; userId: string; tenantId: string }): Promise<StartRideResponseDto> {
-    const { dto, userId, tenantId } = args;
+  async startRide(args: {
+    dto: StartRideDto;
+  }): Promise<StartRideResponseDtoNew> {
+    const userId = this.getCurrentUserId();
+    const tenantId = this.getCurrentTenantId();
+    const { dto } = args;
 
     //check if tenant active
     const tenant = await this.prisma.tenant.findUnique({
@@ -90,33 +124,32 @@ export class DriverRideService {
       throw new NotFoundException('Tenant does not exist or is deleted');
     }
 
-    const driverProfile = await this.prisma.driverProfile.findFirst({
-      where: {
-        userId: userId,
-        tenantId: tenantId,
-        status: 'ACTIVE' // Add enum profileStatus to schema
-      }
-    });
-    if (!driverProfile) {
-      throw new NotFoundException('Driver profile not found or inactive');
-    }
-    const driverProfileId = driverProfile.id;
+    const driverProfile = await this.getCurrentDriverProfile();
 
     // check if ride already exists
     const ongoingRide = await this.prisma.ride.findFirst({
       where: {
-        driverProfileId: driverProfileId,
-        status: { in: [RideStatus.DRAFT, RideStatus.ONGOING] }
-      }
+        driverProfileId: driverProfile.id,
+        status: { in: [RideStatus.DRAFT, RideStatus.ONGOING] },
+      },
+      include: {
+        pricing: true, // Include pricing relation
+      },
     });
     if (ongoingRide) {
-      if (ongoingRide.status === RideStatus.DRAFT && dto.rideStatus === RideStatus.ONGOING) {
+      if (
+        ongoingRide.status === RideStatus.DRAFT &&
+        dto.rideStatus === RideStatus.ONGOING
+      ) {
         const updatedRide = await this.prisma.ride.update({
           where: { id: ongoingRide.id },
           data: {
             status: RideStatus.ONGOING,
-            startedAt: new Date()
-          }
+            startedAt: new Date(),
+          },
+          include: {
+            pricing: true, // Include pricing relation
+          },
         });
         return this.mapRideToStartRideResponseDto(updatedRide);
       }
@@ -126,46 +159,51 @@ export class DriverRideService {
     const pricingPolicy = await this.prisma.pricingPolicy.findFirst({
       where: {
         tenantId: tenantId,
-        isActive: true
-      }
+        isActive: true,
+      },
     });
     if (!pricingPolicy) {
-      throw new UnprocessableEntityException('No active pricing policy found for this tenant');
+      throw new UnprocessableEntityException(
+        'No active pricing policy found for this tenant',
+      );
     }
-    const pricingPolicyId = pricingPolicy.id;
 
     const newRide = await this.prisma.ride.create({
       data: {
         tenantId,
-        driverProfileId,
-        pricingPolicyId,
+        driverProfileId: driverProfile.id,
+        pricingPolicyId: pricingPolicy.id,
         startedAt: new Date(),
-        durationMin: new Prisma.Decimal("0.00"),
-        distanceKm: new Prisma.Decimal("0.000"),
+        durationMin: new Prisma.Decimal('0.00'),
+        distanceKm: new Prisma.Decimal('0.000'),
         fareSubtotal: null,
         taxAmount: null,
         fareTotal: null,
-        status: dto.rideStatus
-      }
+        status: dto.rideStatus,
+      },
+      include: {
+        pricing: true, // Include pricing relation
+      },
     });
 
     return this.mapRideToStartRideResponseDto(newRide);
   }
 
   // end Ride -> for mobile application
-  async endRide(args: { dto: EndRideDto; userId: string; tenantId: string }): Promise<EndRideResponseDto> {
-    const { dto, userId, tenantId } = args;
+  async endRide(args: { dto: EndRideDto }): Promise<EndRideResponseDto> {
+    const userId = this.getCurrentUserId();
+    const tenantId = this.getCurrentTenantId();
+    const { dto } = args;
 
     // 1) Tenant exists
-    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant || tenant.deletedAt) throw new NotFoundException('Tenant does not exist or is deleted');
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    if (!tenant || tenant.deletedAt)
+      throw new NotFoundException('Tenant does not exist or is deleted');
 
     // 2) Resolve driver profile (must be ACTIVE in this tenant)
-    const driverProfile = await this.prisma.driverProfile.findFirst({
-      where: { userId, tenantId, status: 'ACTIVE' },
-      select: { id: true },
-    });
-    if (!driverProfile) throw new NotFoundException('Driver profile not found or inactive');
+    const driverProfile = await this.getCurrentDriverProfile();
 
     // 3) Load ONGOING ride for this driver
     const ride = await this.prisma.ride.findFirst({
@@ -179,11 +217,13 @@ export class DriverRideService {
         id: true,
         tenantId: true,
         driverProfileId: true,
+        pricing: true,
         startedAt: true,
         pricingPolicyId: true,
       },
     });
-    if (!ride) throw new NotFoundException('Ongoing ride not found for this driver');
+    if (!ride)
+      throw new NotFoundException('Ongoing ride not found for this driver');
 
     // 4) Time box & basic validation
     const endedAt = dto.endedAt ? new Date(dto.endedAt) : new Date();
@@ -202,23 +242,27 @@ export class DriverRideService {
     // 5) Pricing policy: use snapshot on ride, else fallback to active
     let pricing = ride.pricingPolicyId
       ? await this.prisma.pricingPolicy.findUnique({
-        where: { id: ride.pricingPolicyId },
-        select: { id: true, baseFare: true, perKm: true },
-      })
+          where: { id: ride.pricingPolicyId },
+          select: { id: true, baseFare: true, perKm: true, perMin: true },
+        })
       : null;
 
     if (!pricing) {
       pricing = await this.prisma.pricingPolicy.findFirst({
         where: { tenantId, isActive: true },
-        select: { id: true, baseFare: true, perKm: true },
+        select: { id: true, baseFare: true, perKm: true, perMin: true },
       });
     }
     if (!pricing) {
-      throw new UnprocessableEntityException('No active pricing policy found for this tenant');
+      throw new UnprocessableEntityException(
+        'No active pricing policy found for this tenant',
+      );
     }
 
     // 6) Night/time-based multiplier from Tenant.settingsJson (Option A)
-    const multiplier = this.getNightTimeMultiplier(tenant.settingsJson, endedAt) ?? new Prisma.Decimal(1);
+    const multiplier =
+      this.getNightTimeMultiplier(tenant.settingsJson, endedAt) ??
+      new Prisma.Decimal(1);
 
     // 7) Decimal-safe math (schema: distance 10,3; duration 10,2; money 2dp). :contentReference[oaicite:1]{index=1}
     const dDistance = new Prisma.Decimal(dto.distanceKm).toDP(3);
@@ -226,8 +270,9 @@ export class DriverRideService {
 
     const base = pricing.baseFare;
     const distanceComponent = pricing.perKm.mul(dDistance);
+    const timeComponent = pricing.perMin.mul(dDuration);
 
-    const subtotalBeforeMult = base.add(distanceComponent);
+    const subtotalBeforeMult = base.add(distanceComponent).add(timeComponent);
     const subtotal = subtotalBeforeMult.mul(multiplier).toDP(2);
 
     const taxRate = new Prisma.Decimal(process.env.DEFAULT_TAX_RATE ?? '0.00');
@@ -247,13 +292,22 @@ export class DriverRideService {
         status: RideStatus.COMPLETED,
       },
       select: {
-        id: true, status: true, tenantId: true, driverProfileId: true, pricingPolicyId: true,
-        startedAt: true, endedAt: true, durationMin: true, distanceKm: true,
-        fareSubtotal: true, taxAmount: true, fareTotal: true,
+        id: true,
+        status: true,
+        tenantId: true,
+        driverProfileId: true,
+        pricingPolicyId: true,
+        startedAt: true,
+        endedAt: true,
+        durationMin: true,
+        distanceKm: true,
+        fareSubtotal: true,
+        taxAmount: true,
+        fareTotal: true,
       },
     });
-        
-    // Create payment record with status "PENDING" after the ride is successfully completed. 
+
+    // Create payment record with status "PENDING" after the ride is successfully completed.
     const paymentRecord = await this.prisma.payment.upsert({
       where: {
         rideId: updated.id,
@@ -275,7 +329,7 @@ export class DriverRideService {
         authorizedAt: null,
         capturedAt: null,
         failureCode: null,
-        externalPaymentId: null
+        externalPaymentId: null,
       },
     });
 
@@ -306,24 +360,22 @@ export class DriverRideService {
       fare,
       paymentId: paymentRecord.id,
       paymentStatus: paymentRecord.status,
-      externalPaymentId: paymentRecord.externalPaymentId!
+      externalPaymentId: paymentRecord.externalPaymentId!,
+      // NEW FIELDS for Viva Terminal integration
+      orderCode: updated.id,      // will be same as rideId
+      amount: this.money(updated.fareTotal!),         // will be same as fareTotal
+      currency: 'EUR',       // will be "EUR"
     };
 
     return res;
-
   }
 
- 
-  async getTodaysSummary(args: { userId: string; tenantId: string }): Promise<TodaysSummaryDto> {
-    const { userId, tenantId } = args;
+  async getTodaysSummary(): Promise<TodaysSummaryDto> {
+    const userId = this.getCurrentUserId();
+    const tenantId = this.getCurrentTenantId();
 
     // get driver profile
-    const driverProfile = await this.prisma.driverProfile.findFirst({
-      where: { userId, tenantId, status: 'ACTIVE' },
-      select: { id: true },
-    });
-    if (!driverProfile) throw new NotFoundException('Driver profile not found or inactive');
-
+    const driverProfile = await this.getCurrentDriverProfile();
     // get today's date range (start and end of day)
     const today = new Date();
     const startOfDay = new Date(today.setHours(0, 0, 0, 0));
@@ -337,20 +389,20 @@ export class DriverRideService {
         status: 'COMPLETED',
         startedAt: {
           gte: startOfDay,
-          lte: endOfDay
-        }
+          lte: endOfDay,
+        },
       },
       _count: { id: true },
-      _sum: { fareTotal: true, durationMin: true }
+      _sum: { fareTotal: true, durationMin: true },
     });
 
     const activeRide = await this.prisma.ride.findFirst({
       where: {
         driverProfileId: driverProfile.id,
         tenantId,
-        status: { in: ['DRAFT', 'ONGOING'] }
+        status: { in: ['DRAFT', 'ONGOING'] },
       },
-      select: { id: true }
+      select: { id: true },
     });
 
     const totalRides = todaysStats._count.id;
@@ -363,26 +415,23 @@ export class DriverRideService {
       totalEarnings,
       currency: 'EUR',
       hoursWorked: totalMinutes > 0 ? +(totalMinutes / 60).toFixed(1) : 0,
-      averageRideValue: totalRides > 0 ?
-        this.money(Number(totalEarnings) / totalRides) : '0.00',
-      activeRideId: activeRide?.id || null
+      averageRideValue:
+        totalRides > 0
+          ? this.money(Number(totalEarnings) / totalRides)
+          : '0.00',
+      activeRideId: activeRide?.id || null,
     };
   }
 
   async getRideHistory(args: {
-    userId: string;
-    tenantId: string;
     dto: RideHistoryRequestDto;
   }): Promise<RideHistoryResponseDto> {
-    const { userId, tenantId, dto } = args;
+    const tenantId = this.getCurrentTenantId();
+    const { dto } = args;
     const { timeFilter, page = 1, limit = 20 } = dto;
 
     // get driver profile
-    const driverProfile = await this.prisma.driverProfile.findFirst({
-      where: { userId, tenantId, status: 'ACTIVE' },
-      select: { id: true },
-    });
-    if (!driverProfile) throw new NotFoundException('Driver profile not found or inactive');
+    const driverProfile = await this.getCurrentDriverProfile();
 
     // calculate date range based on filter
     const now = new Date();
@@ -399,7 +448,7 @@ export class DriverRideService {
         periodLabel = 'Last 30 Days';
         break;
       case 'all':
-        startDate = new Date("2025-01-01");
+        startDate = new Date('2025-01-01');
         periodLabel = 'All Time';
         break;
     }
@@ -414,7 +463,7 @@ export class DriverRideService {
           driverProfileId: driverProfile.id,
           tenantId,
           status: { in: ['COMPLETED', 'CANCELLED'] },
-          startedAt: { gte: startDate }
+          startedAt: { gte: startDate },
         },
         select: {
           id: true,
@@ -423,7 +472,7 @@ export class DriverRideService {
           durationMin: true,
           distanceKm: true,
           fareTotal: true,
-          status: true
+          status: true,
         },
         orderBy: { startedAt: 'desc' },
         skip: offset,
@@ -436,8 +485,8 @@ export class DriverRideService {
           driverProfileId: driverProfile.id,
           tenantId,
           status: { in: ['COMPLETED', 'CANCELLED'] },
-          startedAt: { gte: startDate }
-        }
+          startedAt: { gte: startDate },
+        },
       }),
 
       // summary statistics
@@ -446,33 +495,37 @@ export class DriverRideService {
           driverProfileId: driverProfile.id,
           tenantId,
           status: 'COMPLETED',
-          startedAt: { gte: startDate }
+          startedAt: { gte: startDate },
         },
-        _sum: { fareTotal: true, distanceKm: true }
-      })
+        _sum: { fareTotal: true, distanceKm: true },
+      }),
     ]);
-
 
     const paymentForRide = await this.prisma.payment.findMany({
       where: {
-        rideId: { in: rides.map(r => r.id) },
+        rideId: { in: rides.map((r) => r.id) },
       },
-      select: { id: true, status: true, rideId: true }
-    })
+      select: { id: true, status: true, rideId: true },
+    });
 
     // format rides for flatlist
-    const rideItems: RideHistoryItemDto[] = rides.map(ride => ({
+    const rideItems: RideHistoryItemDto[] = rides.map((ride) => ({
       id: ride.id,
       startedAt: ride.startedAt.toISOString(),
-      endedAt: ride.endedAt?.toISOString() || "",
-      duration: ride.durationMin ? `${Math.round(Number(ride.durationMin))} min` : '',
-      distance: ride.distanceKm ? `${Number(ride.distanceKm).toFixed(1)} km` : '',
+      endedAt: ride.endedAt?.toISOString() || '',
+      duration: ride.durationMin
+        ? `${Math.round(Number(ride.durationMin))} min`
+        : '',
+      distance: ride.distanceKm
+        ? `${Number(ride.distanceKm).toFixed(1)} km`
+        : '',
       earnings: this.money(ride.fareTotal || 0),
       status: ride.status,
       payment: {
-        id: paymentForRide.find(p => p.rideId === ride.id)?.id || '',
-        status: paymentForRide.find(p => p.rideId === ride.id)?.status || 'PENDING',
-      }
+        id: paymentForRide.find((p) => p.rideId === ride.id)?.id || '',
+        status:
+          paymentForRide.find((p) => p.rideId === ride.id)?.status || 'PENDING',
+      },
     }));
 
     const totalPages = Math.ceil(totalCount / limit);
@@ -488,33 +541,24 @@ export class DriverRideService {
       summary: {
         totalEarnings: this.money(summary._sum.fareTotal || 0),
         totalDistance: `${Number(summary._sum.distanceKm || 0).toFixed(1)} km`,
-        periodLabel
-      }
+        periodLabel,
+      },
     };
   }
 
-
-  async getRideDetails(args: {
-    userId: string;
-    tenantId: string;
-    rideId: string;
-  }): Promise<RideDetailsDto> {
-    const { userId, tenantId, rideId } = args;
+  async getRideDetails(args: { rideId: string }): Promise<RideDetailsDto> {
+    const userId = this.getCurrentUserId();
+    const tenantId = this.getCurrentTenantId();
+    const { rideId } = args;
 
     // get driver profile
-    const driverProfile = await this.prisma.driverProfile.findFirst({
-      where: { userId, tenantId, status: 'ACTIVE' },
-      select: { id: true },
-    });
-    if (!driverProfile) throw new NotFoundException('Driver profile not found or inactive');
-
-
+    const driverProfile = await this.getCurrentDriverProfile();
     //get complete ride details
     const ride = await this.prisma.ride.findFirst({
       where: {
         id: rideId,
         driverProfileId: driverProfile.id,
-        tenantId
+        tenantId,
       },
       include: {
         payment: {
@@ -523,15 +567,15 @@ export class DriverRideService {
             status: true,
             provider: true,
             externalPaymentId: true,
-          }
+          },
         },
         pricing: {
           select: {
             baseFare: true,
             perKm: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
     if (!ride) throw new NotFoundException('Ride not found');
 
@@ -545,7 +589,9 @@ export class DriverRideService {
     const fareBreakdown: FareBreakdownDto = {
       base: this.money(ride.pricing?.baseFare || 0),
       distanceComponent: this.money(
-        (ride.pricing?.perKm || new Prisma.Decimal(0)).mul(ride.distanceKm || 0)
+        (ride.pricing?.perKm || new Prisma.Decimal(0)).mul(
+          ride.distanceKm || 0,
+        ),
       ),
       surchargeMultiplier: '1.00', // Placeholder, as we don't store multiplier per ride
       subtotal: this.money(ride.fareSubtotal || 0),
@@ -559,26 +605,49 @@ export class DriverRideService {
       status: ride.status,
       timing: {
         startedAt: ride.startedAt.toISOString(),
-        endedAt: ride.endedAt?.toISOString() || "",
-        duration: durationText
+        endedAt: ride.endedAt?.toISOString() || '',
+        duration: durationText,
       },
       distance: {
         totalKm: Number(ride.distanceKm || 0).toFixed(3),
-        displayKm: `${Number(ride.distanceKm || 0).toFixed(1)} km`
+        displayKm: `${Number(ride.distanceKm || 0).toFixed(1)} km`,
       },
       fare: {
         subtotal: this.money(ride.fareSubtotal || 0),
         tax: this.money(ride.taxAmount || 0),
         total: this.money(ride.fareTotal || 0),
         currency: 'EUR',
-        breakdown: fareBreakdown
+        breakdown: fareBreakdown,
       },
-      payment: ride.payment ? {
-        id: ride.payment.id,
-        status: ride.payment.status,
-        method: ride.payment.provider,
-        externalId: ride.payment.externalPaymentId || undefined
-      } : undefined,
+      payment: ride.payment
+        ? {
+            id: ride.payment.id,
+            status: ride.payment.status,
+            method: ride.payment.provider,
+            externalId: ride.payment.externalPaymentId || undefined,
+          }
+        : undefined,
     };
+  }
+
+  // Helper to get current driver's profile and validate it
+  private async getCurrentDriverProfile() {
+    const userId = this.getCurrentUserId();
+    const tenantId = this.getCurrentTenantId();
+
+    const driverProfile = await this.prisma.driverProfile.findUnique({
+      where: { userId },
+      select: { id: true, tenantId: true, status: true },
+    });
+
+    if (!driverProfile || driverProfile.status !== 'ACTIVE') {
+      throw new NotFoundException('Driver profile not found or inactive');
+    }
+
+    if (driverProfile.tenantId !== tenantId) {
+      throw new ForbiddenException('Driver profile tenant mismatch');
+    }
+
+    return driverProfile;
   }
 }

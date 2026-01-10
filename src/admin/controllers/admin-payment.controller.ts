@@ -79,10 +79,8 @@ export class AdminPaymentController {
   @ApiResponse({ status: 403, description: 'Forbidden - ADMIN or MANAGER role required' })
   async getPayments(
     @Query(new ValidationPipe({ transform: true })) query: PaymentsQueryDto,
-    @Request() req
   ): Promise<PaymentsPageResponse> {
-    const tenantId = req.user.tenantId;
-    return this.adminPaymentService.getPayments(tenantId, query);
+    return this.adminPaymentService.getPayments(query);
   }
 
   @Get('summary')
@@ -117,12 +115,10 @@ export class AdminPaymentController {
   @ApiResponse({ status: 401, description: 'Unauthorized - Invalid JWT token' })
   @ApiResponse({ status: 403, description: 'Forbidden - ADMIN or MANAGER role required' })
   async getPaymentsSummary(
-    @Request() req,
     @Query('from') from?: string,
     @Query('to') to?: string
   ) {
-    const tenantId = req.user.tenantId;
-    return this.adminPaymentService.getPaymentsSummary(tenantId, from, to);
+    return this.adminPaymentService.getPaymentsSummary(from, to);
   }
 
   @Get(':id')
@@ -152,10 +148,8 @@ export class AdminPaymentController {
   @ApiResponse({ status: 404, description: 'Payment not found' })
   async getPaymentById(
     @Param('id') paymentId: string,
-    @Request() req
   ): Promise<PaymentResponseDto> {
-    const tenantId = req.user.tenantId;
-    return this.adminPaymentService.getPaymentById(tenantId, paymentId);
+    return this.adminPaymentService.getPaymentById(paymentId);
   }
 
   @Post()
@@ -187,8 +181,7 @@ export class AdminPaymentController {
     @Body() createPaymentDto: CreatePaymentDto,
     @Request() req
   ): Promise<PaymentResponseDto> {
-    const tenantId = req.user.tenantId;
-    return this.adminPaymentService.createPayment(tenantId, createPaymentDto);
+    return this.adminPaymentService.createPayment(createPaymentDto);
   }
 
   @Patch(':id')
@@ -221,8 +214,7 @@ export class AdminPaymentController {
     @Body() updatePaymentDto: UpdatePaymentDto,
     @Request() req
   ): Promise<PaymentResponseDto> {
-    const tenantId = req.user.tenantId;
-    return this.adminPaymentService.updatePayment(tenantId, paymentId, updatePaymentDto);
+    return this.adminPaymentService.updatePayment(paymentId, updatePaymentDto);
   }
 
   @Delete(':id')
@@ -238,9 +230,7 @@ export class AdminPaymentController {
   @ApiResponse({ status: 404, description: 'Payment not found' })
   async deletePayment(
     @Param('id') paymentId: string,
-    @Request() req
   ): Promise<void> {
-    const tenantId = req.user.tenantId;
-    await this.adminPaymentService.deletePayment(tenantId, paymentId);
+    await this.adminPaymentService.deletePayment(paymentId);
   }
 }

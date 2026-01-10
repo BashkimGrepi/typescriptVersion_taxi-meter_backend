@@ -56,7 +56,12 @@ export class EndRideResponseDto {
 
 
   // payment fields for viva terminals use
-  paymentId?: string;
-  paymentStatus?: string;
-  externalPaymentId?: string;
+  paymentId: string;
+  paymentStatus: string;
+  externalPaymentId: string;
+
+  // NEW FIELDS for Viva Terminal integration
+  orderCode: string;      // will be same as rideId
+  amount: string;         // will be same as fareTotal
+  currency: string;       // will be "EUR"
 }

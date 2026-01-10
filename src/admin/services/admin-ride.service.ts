@@ -1,23 +1,36 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RidesQueryDto, RideResponseDto, RidesPageResponse, RideStatusFilter } from '../dto/ride-admin.dto';
+import { REQUEST } from '@nestjs/core';
+import { request } from 'express';
+import { TenantScopedService } from 'src/common/services/tenant-scoped.service';
 
 @Injectable()
-export class AdminRideService {
-  constructor(private prisma: PrismaService) {}
+export class AdminRideService extends TenantScopedService {
+  constructor(
+    @Inject(PrismaService) private prisma: PrismaService,
+    @Inject(REQUEST) request: Express.Request,
+  ) {
+    super(request);
+  }
 
-  async getRides(tenantId: string, query: RidesQueryDto): Promise<RidesPageResponse> {
+  async getRides(query: RidesQueryDto): Promise<RidesPageResponse> {
+    const tenantId = this.getCurrentTenantId();
     const { from, to, status, driverId, page = 1, pageSize = 25 } = query;
-    
+
     const where = {
       tenantId,
-      ...(from || to ? { 
-        startedAt: { 
-          ...(from ? { gte: new Date(from) } : {}),
-          ...(to ? { lt: new Date(to) } : {})
-        } 
-      } : {}),
-      ...(status && status !== RideStatusFilter.ALL ? { status: status as any } : {}),
+      ...(from || to
+        ? {
+            startedAt: {
+              ...(from ? { gte: new Date(from) } : {}),
+              ...(to ? { lt: new Date(to) } : {}),
+            },
+          }
+        : {}),
+      ...(status && status !== RideStatusFilter.ALL
+        ? { status: status as any }
+        : {}),
       ...(driverId ? { driverProfileId: driverId } : {}),
     };
 
@@ -45,7 +58,7 @@ export class AdminRideService {
     ]);
 
     return {
-      items: items.map(item => ({
+      items: items.map((item) => ({
         ...item,
         startedAt: item.startedAt.toISOString(),
         endedAt: item.endedAt?.toISOString(),
@@ -62,7 +75,9 @@ export class AdminRideService {
     };
   }
 
-  async getRideById(tenantId: string, rideId: string): Promise<RideResponseDto> {
+  async getRideById(rideId: string): Promise<RideResponseDto> {
+    const tenantId = this.getCurrentTenantId();
+
     const ride = await this.prisma.ride.findFirst({
       where: { id: rideId, tenantId },
       select: {

@@ -8,7 +8,4 @@ export class LoginDto {
   @IsString()
   password: string;
   
-  @IsOptional()
-  @IsString()
-  tenantId?: string;
 }

@@ -1,13 +1,10 @@
 import { IsDateString, IsOptional, IsUUID } from "class-validator";
-import { from } from "rxjs";
 
 export class SummaryQueryDto{
     @IsDateString() from!: string; //ISO
     @IsDateString() to!: string; //ISO
     
-    @IsOptional()
-    @IsUUID('4')
-    tenantId?: string;
+  
 }
 
 export class SummaryDto {

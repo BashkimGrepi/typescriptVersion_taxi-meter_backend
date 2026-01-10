@@ -23,6 +23,6 @@ export class ReportsController {
 
         const from = new Date(q.from);
         const to = new Date(q.to);
-        return this.reportsService.getSummary(tenantId, from, to);
+        return this.reportsService.getSummary(from, to);
     }
 } 

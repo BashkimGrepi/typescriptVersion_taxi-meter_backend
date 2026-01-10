@@ -1,5 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
 import { Prisma, PaymentStatus, RideStatus } from '@prisma/client';
+import { request } from 'express';
+import { TenantScopedService } from 'src/common/services/tenant-scoped.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 /** What each line (payment) will look like for the snapshot/PDF */
@@ -42,8 +45,13 @@ export type ExportExceptions = {
 };
 
 @Injectable()
-export class ExportDataService {
-  constructor(private readonly prisma: PrismaService) {}
+export class ExportDataService extends TenantScopedService {
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(REQUEST) request: Express.Request
+  ) {
+    super(request);
+  }
 
   /** WHY: central place to convert any numeric/decimal to money string safely */
   private money(v: Prisma.Decimal | number | null | undefined, dp = 2): string {
@@ -98,12 +106,13 @@ export class ExportDataService {
    * Load the dataset for the export (PAID payments in range), compute VAT, and prepare exceptions & summary.
    * WHY: This is the single place your endpoint will call before building JSON/PDF.
    */
-  async loadPaymentsDataset(tenantId: string, from: Date, to: Date): Promise<{
+  async loadPaymentsDataset(from: Date, to: Date): Promise<{
     rows: ExportPaymentRow[];
     summaryByRate: VatRateBucket[];             // rate-only buckets
     summaryByRateAndMethod: VatRateBucket[];    // optional extra breakdown
     exceptions: ExportExceptions;
   }> {
+    const tenantId = this.getCurrentTenantId();
     if (!Number.isFinite(+from) || !Number.isFinite(+to) || +from >= +to) {
       throw new BadRequestException('Invalid date range');
     }

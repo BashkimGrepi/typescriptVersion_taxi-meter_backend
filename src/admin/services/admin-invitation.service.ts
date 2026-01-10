@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { 
   CreateInvitationDto, 
@@ -8,12 +8,23 @@ import {
 } from '../dto/invitation-admin.dto';
 import { Role } from '@prisma/client';
 import * as crypto from 'crypto';
+import { REQUEST } from '@nestjs/core';
+import { request } from 'express';
+import { TenantScopedService } from 'src/common/services/tenant-scoped.service';
 
 @Injectable()
-export class AdminInvitationService {
-  constructor(private prisma: PrismaService) {}
+export class AdminInvitationService extends TenantScopedService {
+  constructor(
+    @Inject(PrismaService) private prisma: PrismaService,
+    @Inject(REQUEST) request: Express.Request,
+  ) {
+    super(request);
+  }
 
-  async getInvitations(tenantId: string, query: InvitationsQueryDto): Promise<InvitationsPageResponse> {
+  async getInvitations(
+    query: InvitationsQueryDto,
+  ): Promise<InvitationsPageResponse> {
+    const tenantId = this.getCurrentTenantId();
     const { status, role, page = 1, pageSize = 25 } = query;
 
     // Build filter conditions
@@ -56,25 +67,25 @@ export class AdminInvitationService {
         include: {
           invitedByUser: {
             select: {
-              email: true
-            }
+              email: true,
+            },
           },
           driverProfile: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
-        }
+              lastName: true,
+            },
+          },
+        },
       }),
-      this.prisma.invitation.count({ where })
+      this.prisma.invitation.count({ where }),
     ]);
 
     // Transform to response format
-    const items: InvitationResponseDto[] = invitations.map(invitation => {
+    const items: InvitationResponseDto[] = invitations.map((invitation) => {
       const now = new Date();
       let status: string;
-      
+
       if (invitation.acceptedAt) {
         status = 'accepted';
       } else if (invitation.expiresAt <= now) {
@@ -93,10 +104,10 @@ export class AdminInvitationService {
         expiresAt: invitation.expiresAt.toISOString(),
         acceptedAt: invitation.acceptedAt?.toISOString(),
         invitedByName: invitation.invitedByUser?.email || 'Unknown',
-        driverProfileName: invitation.driverProfile 
+        driverProfileName: invitation.driverProfile
           ? `${invitation.driverProfile.firstName} ${invitation.driverProfile.lastName}`
           : undefined,
-        driverProfileId: invitation.driverProfileId || undefined
+        driverProfileId: invitation.driverProfileId || undefined,
       };
     });
 
@@ -107,38 +118,43 @@ export class AdminInvitationService {
       total: totalCount,
       page,
       pageSize,
-      totalPages
+      totalPages,
     };
   }
 
-  async getInvitationById(tenantId: string, invitationId: string): Promise<InvitationResponseDto> {
+  async getInvitationById(
+    invitationId: string,
+  ): Promise<InvitationResponseDto> {
+    const tenantId = this.getCurrentTenantId();
     const invitation = await this.prisma.invitation.findFirst({
       where: {
         id: invitationId,
-        tenantId
+        tenantId,
       },
       include: {
         invitedByUser: {
           select: {
-            email: true
-          }
+            email: true,
+          },
         },
         driverProfile: {
           select: {
             firstName: true,
-            lastName: true
-          }
-        }
-      }
+            lastName: true,
+          },
+        },
+      },
     });
 
     if (!invitation) {
-      throw new NotFoundException(`Invitation with ID ${invitationId} not found`);
+      throw new NotFoundException(
+        `Invitation with ID ${invitationId} not found`,
+      );
     }
 
     const now = new Date();
     let status: string;
-    
+
     if (invitation.acceptedAt) {
       status = 'accepted';
     } else if (invitation.expiresAt <= now) {
@@ -157,19 +173,21 @@ export class AdminInvitationService {
       expiresAt: invitation.expiresAt.toISOString(),
       acceptedAt: invitation.acceptedAt?.toISOString(),
       invitedByName: invitation.invitedByUser?.email || 'Unknown',
-      driverProfileName: invitation.driverProfile 
+      driverProfileName: invitation.driverProfile
         ? `${invitation.driverProfile.firstName} ${invitation.driverProfile.lastName}`
         : undefined,
-      driverProfileId: invitation.driverProfileId || undefined
+      driverProfileId: invitation.driverProfileId || undefined,
     };
   }
 
   async createInvitation(
-    tenantId: string, 
-    invitedByUserId: string, 
-    createInvitationDto: CreateInvitationDto
+    invitedByUserId: string,
+    createInvitationDto: CreateInvitationDto,
   ): Promise<InvitationResponseDto> {
-    const { email, role, firstName, lastName, phone, driverProfileId } = createInvitationDto;
+    const tenantId = this.getCurrentTenantId();
+    const userId = this.getCurrentUserId();
+    const { email, role, firstName, lastName, phone, driverProfileId } =
+      createInvitationDto;
 
     // Check if there's already a pending invitation for this email
     const existingInvitation = await this.prisma.invitation.findFirst({
@@ -177,12 +195,14 @@ export class AdminInvitationService {
         tenantId,
         email,
         acceptedAt: null,
-        expiresAt: { gt: new Date() }
-      }
+        expiresAt: { gt: new Date() },
+      },
     });
 
     if (existingInvitation) {
-      throw new BadRequestException(`A pending invitation already exists for ${email}`);
+      throw new BadRequestException(
+        `A pending invitation already exists for ${email}`,
+      );
     }
 
     // Generate secure token and expiry (7 days from now)
@@ -191,24 +211,27 @@ export class AdminInvitationService {
 
     // For DRIVER role, create or link driver profile
     let finalDriverProfileId = driverProfileId;
-    
+
     if (role === 'DRIVER' && !driverProfileId) {
       if (!firstName || !lastName) {
-        throw new BadRequestException('firstName and lastName are required when creating a new driver profile');
+        throw new BadRequestException(
+          'firstName and lastName are required when creating a new driver profile',
+        );
       }
 
       // Create new driver profile
       const driverProfile = await this.prisma.driverProfile.create({
         data: {
           tenantId,
+          userId,
           firstName,
           lastName,
           phone: phone || null,
           email,
-          status: 'INVITED'
-        }
+          status: 'INVITED',
+        },
       });
-      
+
       finalDriverProfileId = driverProfile.id;
     }
 
@@ -221,21 +244,21 @@ export class AdminInvitationService {
         token,
         expiresAt,
         invitedByUserId,
-        driverProfileId: finalDriverProfileId || null
+        driverProfileId: finalDriverProfileId || null,
       },
       include: {
         invitedByUser: {
           select: {
-            email: true
-          }
+            email: true,
+          },
         },
         driverProfile: {
           select: {
             firstName: true,
-            lastName: true
-          }
-        }
-      }
+            lastName: true,
+          },
+        },
+      },
     });
 
     return {
@@ -248,28 +271,33 @@ export class AdminInvitationService {
       expiresAt: invitation.expiresAt.toISOString(),
       acceptedAt: undefined,
       invitedByName: invitation.invitedByUser?.email || 'Unknown',
-      driverProfileName: invitation.driverProfile 
+      driverProfileName: invitation.driverProfile
         ? `${invitation.driverProfile.firstName} ${invitation.driverProfile.lastName}`
         : undefined,
-      driverProfileId: invitation.driverProfileId || undefined
+      driverProfileId: invitation.driverProfileId || undefined,
     };
   }
 
-  async resendInvitation(tenantId: string, invitationId: string): Promise<InvitationResponseDto> {
+  async resendInvitation(invitationId: string): Promise<InvitationResponseDto> {
+    const tenantId = this.getCurrentTenantId();
     // Check if invitation exists and belongs to tenant
     const existingInvitation = await this.prisma.invitation.findFirst({
       where: {
         id: invitationId,
-        tenantId
-      }
+        tenantId,
+      },
     });
 
     if (!existingInvitation) {
-      throw new NotFoundException(`Invitation with ID ${invitationId} not found`);
+      throw new NotFoundException(
+        `Invitation with ID ${invitationId} not found`,
+      );
     }
 
     if (existingInvitation.acceptedAt) {
-      throw new BadRequestException('Cannot resend an already accepted invitation');
+      throw new BadRequestException(
+        'Cannot resend an already accepted invitation',
+      );
     }
 
     // Generate new token and expiry
@@ -281,21 +309,21 @@ export class AdminInvitationService {
       where: { id: invitationId },
       data: {
         token,
-        expiresAt
+        expiresAt,
       },
       include: {
         invitedByUser: {
           select: {
-            email: true
-          }
+            email: true,
+          },
         },
         driverProfile: {
           select: {
             firstName: true,
-            lastName: true
-          }
-        }
-      }
+            lastName: true,
+          },
+        },
+      },
     });
 
     return {
@@ -308,33 +336,38 @@ export class AdminInvitationService {
       expiresAt: invitation.expiresAt.toISOString(),
       acceptedAt: invitation.acceptedAt?.toISOString(),
       invitedByName: invitation.invitedByUser?.email || 'Unknown',
-      driverProfileName: invitation.driverProfile 
+      driverProfileName: invitation.driverProfile
         ? `${invitation.driverProfile.firstName} ${invitation.driverProfile.lastName}`
         : undefined,
-      driverProfileId: invitation.driverProfileId || undefined
+      driverProfileId: invitation.driverProfileId || undefined,
     };
   }
 
-  async cancelInvitation(tenantId: string, invitationId: string): Promise<void> {
+  async cancelInvitation(invitationId: string): Promise<void> {
+    const tenantId = this.getCurrentTenantId();
     // Check if invitation exists and belongs to tenant
     const existingInvitation = await this.prisma.invitation.findFirst({
       where: {
         id: invitationId,
-        tenantId
-      }
+        tenantId,
+      },
     });
 
     if (!existingInvitation) {
-      throw new NotFoundException(`Invitation with ID ${invitationId} not found`);
+      throw new NotFoundException(
+        `Invitation with ID ${invitationId} not found`,
+      );
     }
 
     if (existingInvitation.acceptedAt) {
-      throw new BadRequestException('Cannot cancel an already accepted invitation');
+      throw new BadRequestException(
+        'Cannot cancel an already accepted invitation',
+      );
     }
 
     // Delete the invitation
     await this.prisma.invitation.delete({
-      where: { id: invitationId }
+      where: { id: invitationId },
     });
   }
 }

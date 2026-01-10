@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { 
   ReportsQueryDto,
@@ -11,16 +11,29 @@ import {
 } from '../dto/report-admin.dto';
 import { Decimal } from '@prisma/client/runtime/library';
 import { RideStatus } from '@prisma/client';
+import { REQUEST } from '@nestjs/core';
+import { request } from 'express';
+import { TenantScopedService } from 'src/common/services/tenant-scoped.service';
 
 @Injectable()
-export class AdminReportService {
-  constructor(private prisma: PrismaService) {}
+export class AdminReportService extends TenantScopedService {
+  constructor(
+    @Inject(PrismaService) private prisma: PrismaService,
+    @Inject(REQUEST) request: Express.Request,
+  ) {
+    super(request);
+  }
 
-  async getRevenueReport(tenantId: string, query: ReportsQueryDto): Promise<RevenueReportResponse> {
+  async getRevenueReport(
+    query: ReportsQueryDto,
+  ): Promise<RevenueReportResponse> {
+    const tenantId = this.getCurrentTenantId();
     const { from, to, driverId, granularity = 'daily' } = query;
 
     // Build date range
-    const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default: 30 days ago
+    const fromDate = from
+      ? new Date(from)
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default: 30 days ago
     const toDate = to ? new Date(to) : new Date();
 
     // Build filter conditions
@@ -29,8 +42,8 @@ export class AdminReportService {
       status: RideStatus.COMPLETED,
       endedAt: {
         gte: fromDate,
-        lte: toDate
-      }
+        lte: toDate,
+      },
     };
 
     if (driverId) {
@@ -44,9 +57,9 @@ export class AdminReportService {
         endedAt: true,
         fareTotal: true,
         distanceKm: true,
-        durationMin: true
+        durationMin: true,
       },
-      orderBy: { endedAt: 'asc' }
+      orderBy: { endedAt: 'asc' },
     });
 
     // Group by time period
@@ -54,13 +67,26 @@ export class AdminReportService {
 
     // Calculate summary
     const totalRides = rides.length;
-    const totalRevenue = rides.reduce((sum, ride) => sum.add(ride.fareTotal || new Decimal(0)), new Decimal(0));
-    const totalDistance = rides.reduce((sum, ride) => sum.add(ride.distanceKm || new Decimal(0)), new Decimal(0));
-    const totalDuration = rides.reduce((sum, ride) => sum.add(ride.durationMin || new Decimal(0)), new Decimal(0));
-    
-    const daysDiff = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24));
-    const avgRevenuePerDay = totalRides > 0 ? totalRevenue.div(daysDiff) : new Decimal(0);
-    const avgFarePerRide = totalRides > 0 ? totalRevenue.div(totalRides) : new Decimal(0);
+    const totalRevenue = rides.reduce(
+      (sum, ride) => sum.add(ride.fareTotal || new Decimal(0)),
+      new Decimal(0),
+    );
+    const totalDistance = rides.reduce(
+      (sum, ride) => sum.add(ride.distanceKm || new Decimal(0)),
+      new Decimal(0),
+    );
+    const totalDuration = rides.reduce(
+      (sum, ride) => sum.add(ride.durationMin || new Decimal(0)),
+      new Decimal(0),
+    );
+
+    const daysDiff = Math.ceil(
+      (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    const avgRevenuePerDay =
+      totalRides > 0 ? totalRevenue.div(daysDiff) : new Decimal(0);
+    const avgFarePerRide =
+      totalRides > 0 ? totalRevenue.div(totalRides) : new Decimal(0);
     const totalDurationHours = totalDuration.div(60);
 
     return {
@@ -72,16 +98,21 @@ export class AdminReportService {
         avgRevenuePerDay: avgRevenuePerDay.toString(),
         avgFarePerRide: avgFarePerRide.toString(),
         totalDistanceKm: totalDistance.toString(),
-        totalDurationHours: totalDurationHours.toString()
-      }
+        totalDurationHours: totalDurationHours.toString(),
+      },
     };
   }
 
-  async getDriverPerformanceReport(tenantId: string, query: ReportsQueryDto): Promise<DriverPerformanceResponse> {
+  async getDriverPerformanceReport(
+    query: ReportsQueryDto,
+  ): Promise<DriverPerformanceResponse> {
+    const tenantId = this.getCurrentTenantId();
     const { from, to } = query;
 
     // Build date range
-    const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const fromDate = from
+      ? new Date(from)
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const toDate = to ? new Date(to) : new Date();
 
     // Get driver performance data
@@ -91,65 +122,82 @@ export class AdminReportService {
         status: RideStatus.COMPLETED,
         endedAt: {
           gte: fromDate,
-          lte: toDate
-        }
+          lte: toDate,
+        },
       },
       by: ['driverProfileId'],
       _count: { _all: true },
       _sum: {
         fareTotal: true,
         distanceKm: true,
-        durationMin: true
-      }
+        durationMin: true,
+      },
     });
 
     // Get driver names
     const driverProfiles = await this.prisma.driverProfile.findMany({
       where: {
         tenantId,
-        id: { in: driverStats.map(stat => stat.driverProfileId) }
+        id: { in: driverStats.map((stat) => stat.driverProfileId) },
       },
       select: {
         id: true,
         firstName: true,
-        lastName: true
-      }
+        lastName: true,
+      },
     });
 
-    const driverMap = new Map(driverProfiles.map(driver => [driver.id, driver]));
-    const daysDiff = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24));
+    const driverMap = new Map(
+      driverProfiles.map((driver) => [driver.id, driver]),
+    );
+    const daysDiff = Math.ceil(
+      (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
 
     // Transform to response format
-    const drivers: DriverPerformanceItem[] = driverStats.map(stat => {
+    const drivers: DriverPerformanceItem[] = driverStats.map((stat) => {
       const driver = driverMap.get(stat.driverProfileId);
       const rideCount = stat._count?._all || 0;
       const totalRevenue = stat._sum?.fareTotal || new Decimal(0);
       const totalDistance = stat._sum?.distanceKm || new Decimal(0);
       const totalDuration = stat._sum?.durationMin || new Decimal(0);
-      
+
       return {
         driverProfileId: stat.driverProfileId,
         firstName: driver?.firstName || 'Unknown',
         lastName: driver?.lastName || 'Driver',
         rideCount,
         totalRevenue: totalRevenue.toString(),
-        avgFarePerRide: rideCount > 0 ? totalRevenue.div(rideCount).toString() : '0',
+        avgFarePerRide:
+          rideCount > 0 ? totalRevenue.div(rideCount).toString() : '0',
         totalDistanceKm: totalDistance.toString(),
         totalDurationHours: totalDuration.div(60).toString(),
-        avgRidesPerDay: daysDiff > 0 ? (rideCount / daysDiff).toFixed(1) : '0'
+        avgRidesPerDay: daysDiff > 0 ? (rideCount / daysDiff).toFixed(1) : '0',
       };
     });
 
     // Sort by total revenue descending
-    drivers.sort((a, b) => parseFloat(b.totalRevenue) - parseFloat(a.totalRevenue));
+    drivers.sort(
+      (a, b) => parseFloat(b.totalRevenue) - parseFloat(a.totalRevenue),
+    );
 
     // Calculate fleet summary
-    const totalDrivers = await this.prisma.driverProfile.count({ where: { tenantId } });
+    const totalDrivers = await this.prisma.driverProfile.count({
+      where: { tenantId },
+    });
     const activeDrivers = drivers.length;
-    const totalRides = drivers.reduce((sum, driver) => sum + driver.rideCount, 0);
-    const totalRevenue = drivers.reduce((sum, driver) => sum.add(new Decimal(driver.totalRevenue)), new Decimal(0));
-    const avgRidesPerDriver = activeDrivers > 0 ? (totalRides / activeDrivers).toFixed(1) : '0';
-    const avgRevenuePerDriver = activeDrivers > 0 ? totalRevenue.div(activeDrivers).toString() : '0';
+    const totalRides = drivers.reduce(
+      (sum, driver) => sum + driver.rideCount,
+      0,
+    );
+    const totalRevenue = drivers.reduce(
+      (sum, driver) => sum.add(new Decimal(driver.totalRevenue)),
+      new Decimal(0),
+    );
+    const avgRidesPerDriver =
+      activeDrivers > 0 ? (totalRides / activeDrivers).toFixed(1) : '0';
+    const avgRevenuePerDriver =
+      activeDrivers > 0 ? totalRevenue.div(activeDrivers).toString() : '0';
 
     return {
       period: `${fromDate.toISOString().split('T')[0]} to ${toDate.toISOString().split('T')[0]}`,
@@ -160,16 +208,21 @@ export class AdminReportService {
         totalRides,
         totalRevenue: totalRevenue.toString(),
         avgRidesPerDriver,
-        avgRevenuePerDriver
-      }
+        avgRevenuePerDriver,
+      },
     };
   }
 
-  async getPaymentMethodReport(tenantId: string, query: ReportsQueryDto): Promise<PaymentMethodReportResponse> {
+  async getPaymentMethodReport(
+    query: ReportsQueryDto,
+  ): Promise<PaymentMethodReportResponse> {
+    const tenantId = this.getCurrentTenantId();
     const { from, to } = query;
 
     // Build date range - using ride relationship since Payment doesn't have createdAt
-    const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const fromDate = from
+      ? new Date(from)
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const toDate = to ? new Date(to) : new Date();
 
     // Get payment method statistics
@@ -179,13 +232,13 @@ export class AdminReportService {
         ride: {
           endedAt: {
             gte: fromDate,
-            lte: toDate
-          }
-        }
+            lte: toDate,
+          },
+        },
       },
       by: ['provider'],
       _count: { _all: true },
-      _sum: { amount: true }
+      _sum: { amount: true },
     });
 
     // Get total rides for payment rate calculation
@@ -195,33 +248,46 @@ export class AdminReportService {
         status: RideStatus.COMPLETED,
         endedAt: {
           gte: fromDate,
-          lte: toDate
-        }
-      }
+          lte: toDate,
+        },
+      },
     });
 
-    const totalPayments = paymentStats.reduce((sum, stat) => sum + (stat._count?._all || 0), 0);
-    const totalAmount = paymentStats.reduce((sum, stat) => sum.add(stat._sum?.amount || new Decimal(0)), new Decimal(0));
+    const totalPayments = paymentStats.reduce(
+      (sum, stat) => sum + (stat._count?._all || 0),
+      0,
+    );
+    const totalAmount = paymentStats.reduce(
+      (sum, stat) => sum.add(stat._sum?.amount || new Decimal(0)),
+      new Decimal(0),
+    );
 
     // Transform to response format
-    const paymentMethods: PaymentMethodReportItem[] = paymentStats.map(stat => {
-      const paymentCount = stat._count?._all || 0;
-      const amount = stat._sum?.amount || new Decimal(0);
-      const percentage = totalPayments > 0 ? (paymentCount / totalPayments) * 100 : 0;
+    const paymentMethods: PaymentMethodReportItem[] = paymentStats.map(
+      (stat) => {
+        const paymentCount = stat._count?._all || 0;
+        const amount = stat._sum?.amount || new Decimal(0);
+        const percentage =
+          totalPayments > 0 ? (paymentCount / totalPayments) * 100 : 0;
 
-      return {
-        paymentMethod: stat.provider,
-        paymentCount,
-        totalAmount: amount.toString(),
-        percentage: parseFloat(percentage.toFixed(1))
-      };
-    });
+        return {
+          paymentMethod: stat.provider,
+          paymentCount,
+          totalAmount: amount.toString(),
+          percentage: parseFloat(percentage.toFixed(1)),
+        };
+      },
+    );
 
     // Sort by total amount descending
-    paymentMethods.sort((a, b) => parseFloat(b.totalAmount) - parseFloat(a.totalAmount));
+    paymentMethods.sort(
+      (a, b) => parseFloat(b.totalAmount) - parseFloat(a.totalAmount),
+    );
 
-    const avgPaymentAmount = totalPayments > 0 ? totalAmount.div(totalPayments).toString() : '0';
-    const paymentRate = totalRides > 0 ? ((totalPayments / totalRides) * 100).toFixed(1) : '0';
+    const avgPaymentAmount =
+      totalPayments > 0 ? totalAmount.div(totalPayments).toString() : '0';
+    const paymentRate =
+      totalRides > 0 ? ((totalPayments / totalRides) * 100).toFixed(1) : '0';
 
     return {
       period: `${fromDate.toISOString().split('T')[0]} to ${toDate.toISOString().split('T')[0]}`,
@@ -230,17 +296,20 @@ export class AdminReportService {
         totalPayments,
         totalAmount: totalAmount.toString(),
         avgPaymentAmount,
-        paymentRate
-      }
+        paymentRate,
+      },
     };
   }
 
-  private groupRidesByPeriod(rides: any[], granularity: string): RevenueReportItem[] {
+  private groupRidesByPeriod(
+    rides: any[],
+    granularity: string,
+  ): RevenueReportItem[] {
     const groups = new Map<string, any[]>();
 
-    rides.forEach(ride => {
+    rides.forEach((ride) => {
       if (!ride.endedAt) return;
-      
+
       const date = new Date(ride.endedAt);
       let periodKey: string;
 
@@ -265,23 +334,35 @@ export class AdminReportService {
     });
 
     // Convert groups to report items
-    const items: RevenueReportItem[] = Array.from(groups.entries()).map(([period, periodRides]) => {
-      const rideCount = periodRides.length;
-      const totalRevenue = periodRides.reduce((sum, ride) => sum.add(ride.fareTotal || new Decimal(0)), new Decimal(0));
-      const totalDistance = periodRides.reduce((sum, ride) => sum.add(ride.distanceKm || new Decimal(0)), new Decimal(0));
-      const totalDuration = periodRides.reduce((sum, ride) => sum.add(ride.durationMin || new Decimal(0)), new Decimal(0));
-      
-      const avgFarePerRide = rideCount > 0 ? totalRevenue.div(rideCount) : new Decimal(0);
+    const items: RevenueReportItem[] = Array.from(groups.entries()).map(
+      ([period, periodRides]) => {
+        const rideCount = periodRides.length;
+        const totalRevenue = periodRides.reduce(
+          (sum, ride) => sum.add(ride.fareTotal || new Decimal(0)),
+          new Decimal(0),
+        );
+        const totalDistance = periodRides.reduce(
+          (sum, ride) => sum.add(ride.distanceKm || new Decimal(0)),
+          new Decimal(0),
+        );
+        const totalDuration = periodRides.reduce(
+          (sum, ride) => sum.add(ride.durationMin || new Decimal(0)),
+          new Decimal(0),
+        );
 
-      return {
-        period,
-        rideCount,
-        totalRevenue: totalRevenue.toString(),
-        avgFarePerRide: avgFarePerRide.toString(),
-        totalDistanceKm: totalDistance.toString(),
-        totalDurationMin: totalDuration.toString()
-      };
-    });
+        const avgFarePerRide =
+          rideCount > 0 ? totalRevenue.div(rideCount) : new Decimal(0);
+
+        return {
+          period,
+          rideCount,
+          totalRevenue: totalRevenue.toString(),
+          avgFarePerRide: avgFarePerRide.toString(),
+          totalDistanceKm: totalDistance.toString(),
+          totalDurationMin: totalDuration.toString(),
+        };
+      },
+    );
 
     // Sort by period
     items.sort((a, b) => a.period.localeCompare(b.period));
