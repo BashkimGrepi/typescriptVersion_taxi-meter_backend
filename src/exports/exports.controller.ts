@@ -10,7 +10,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { UniversalV1Guard } from 'src/auth/guards/universal-v1.guard';
 import { SnapshotService } from './snapshot.service';
 import { PdfService } from './pdf/pdf.service';
 import * as fs from 'node:fs/promises';
@@ -27,7 +27,7 @@ function safeTs(d = new Date()) {
   return iso.slice(0,10).replace(/-/g,'') + '-' + iso.slice(11,19).replace(/:/g,'');
 }
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(UniversalV1Guard)
 @Controller('admin/exports')
 export class ExportsController extends TenantScopedService{
   constructor(

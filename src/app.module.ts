@@ -1,4 +1,4 @@
-import { MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -17,7 +17,6 @@ import { PricingPoliciesModule } from './pricings/pricing-policies.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import * as redisStore from 'cache-manager-redis-store';
 import { VivaWebhookModule } from './viva-webhook/viva-webhook.module';
-import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
 
 @Module({
   imports: [
@@ -49,14 +48,4 @@ import { TenantContextMiddleware } from './common/middleware/tenant-context.midd
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(TenantContextMiddleware)
-      .exclude(
-        { path: 'auth/(.*)', method: RequestMethod.ALL }, // Exclude all auth routes
-        { path: 'health', method: RequestMethod.GET }, // Exclude health check
-      )
-      .forRoutes({ path: '*', method: RequestMethod.ALL });
-  }
-}
+export class AppModule {}

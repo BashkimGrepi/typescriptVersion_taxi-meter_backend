@@ -1,12 +1,12 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { createParamDecorator, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 
 export interface AdminInfo {
   userId: string;
   email: string;
   tenantId: string;
   tenantName: string;
-  role: string;
-  type: string;
+  role: 'ADMIN';
+  type: 'access';
 }
 
 export const Admin = createParamDecorator(
@@ -16,7 +16,7 @@ export const Admin = createParamDecorator(
 
     // Ensure this is an admin user
     if (!user || user.role !== 'ADMIN') {
-      throw new Error('Not an admin user');
+      throw new UnauthorizedException('Not an admin user');
     }
 
     return {

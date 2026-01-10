@@ -21,7 +21,7 @@ enum RideStatus {
 }
 
 enum PaymentProvider {
-  STRIPE
+  CASH
   VIVA
 }
 
@@ -55,48 +55,60 @@ enum ExportArchiveType {
   full
 }
 
-enum UserStatus {
-  ACTIVE
-  OFFLINE
+enum RidePricingMode {
+  METER
+  FIXED_PRICE
+  CUSTOM_FIXED
 }
 
 model Tenant {
-  id            String            @id @default(uuid())
-  name          String
-  businessId    String // yTunnus
-  settingsJson  Json?
-  users         User[]
-  drivers       DriverProfile[]
-  pricing       PricingPolicy[]
-  rides         Ride[]
-  providerAccts ProviderAccount[]
-  invitations   Invitation[]
-  payments      Payment[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  deletedAt     DateTime?
-  oauthStates   OAuthState[]
+  id               String             @id @default(uuid())
+  name             String
+  businessId       String // yTunnus
+  settingsJson     Json?
+  memberships      Membership[]
+  drivers          DriverProfile[]
+  pricing          PricingPolicy[]
+  rides            Ride[]
+  providerAccts    ProviderAccount[]
+  invitations      Invitation[]
+  payments         Payment[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
+  oauthStates      OAuthState[]
+  FixedPricePolicy FixedPricePolicy[]
 
   @@index([businessId])
 }
 
 model User {
   id            String         @id @default(uuid())
-  email         String         @unique  // GLOBAL UNIQUE
+  email         String         @unique
+  username      String?
   passwordHash  String
-  tenantId      String
-  role          Role      
-  status        UserStatus         // ACTIVE, LOCKED, etc.
+  status        String // ACTIVE, LOCKED, etc.
+  memberships   Membership[]
   driverProfile DriverProfile?
-  invitations   Invitation[]   // Keep for audit trail
+  invitations   Invitation[] // invitations sent by this user
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  @@index([tenantId, role])
 }
 
+model Membership {
+  id        String   @id @default(uuid())
+  userId    String
+  tenantId  String
+  role      Role
+  invitedBy String?
+  createdAt DateTime @default(now())
 
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId, role])
+}
 
 model Invitation {
   id              String    @id @default(uuid())
@@ -117,7 +129,7 @@ model Invitation {
 model DriverProfile {
   id          String       @id @default(uuid())
   tenantId    String
-  userId      String       
+  userId      String?      @unique // null until invitation accepted
   firstName   String
   lastName    String
   email       String
@@ -126,12 +138,12 @@ model DriverProfile {
   rides       Ride[]
   invitations Invitation[] // invitations for this driver profile
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  FixedPricePolicy FixedPricePolicy[]
 
-  @@unique([userId])
   @@index([tenantId])
-  
+  @@index([userId])
 }
 
 model PricingPolicy {
@@ -154,27 +166,52 @@ model PricingPolicy {
   @@index([tenantId, updatedAt])
 }
 
-model Ride {
-  id              String        @id @default(uuid())
-  tenantId        String // Every ride must belong to a tenant
-  driverProfileId String
-  pricingPolicyId String?
-  startedAt       DateTime
-  endedAt         DateTime?
-  durationMin     Decimal?      @db.Decimal(10, 2)
-  distanceKm      Decimal?      @db.Decimal(10, 3)
-  fareSubtotal    Decimal?      @db.Decimal(10, 2)
-  taxAmount       Decimal?      @db.Decimal(10, 2)
-  fareTotal       Decimal?      @db.Decimal(10, 2)
-  status          RideStatus
-  payment         Payment?
-  links           PaymentLink[]
+model FixedPricePolicy {
+  id              String  @id @default(uuid())
+  tenantId        String
+  driverProfileId String? // null = tenant-wide tariff; not null = personal
+  name            String // e.g. "Airport flat rate"
+  amount          Decimal @db.Decimal(10, 2) // total price incl. VAT
 
-  webhookEvents WebhookEvent[]
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  createdByUserId String?
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  driverProfile DriverProfile  @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
-  pricing       PricingPolicy? @relation(fields: [pricingPolicyId], references: [id], onDelete: SetNull)
+  driverProfile DriverProfile? @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+
+  rides Ride[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, driverProfileId])
+}
+
+model Ride {
+  id                 String          @id @default(uuid())
+  tenantId           String // Every ride must belong to a tenant
+  driverProfileId    String
+  pricingPolicyId    String?
+  startedAt          DateTime
+  endedAt            DateTime?
+  durationMin        Decimal?        @db.Decimal(10, 2)
+  distanceKm         Decimal?        @db.Decimal(10, 3)
+  fareSubtotal       Decimal?        @db.Decimal(10, 2)
+  taxAmount          Decimal?        @db.Decimal(10, 2)
+  fareTotal          Decimal?        @db.Decimal(10, 2)
+  status             RideStatus
+  pricingMode        RidePricingMode @default(METER)
+  fixedPricePolicyId String? // for FIXED_POLICY
+  customFixedFare    Decimal?        @db.Decimal(10, 2) // for  CUSTOM_FIXED
+
+  payment       Payment?
+  receipts      Receipt[]
+  links         PaymentLink[]
+  webhookEvents WebhookEvent[]
+
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  driverProfile DriverProfile     @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  pricing       PricingPolicy?    @relation(fields: [pricingPolicyId], references: [id], onDelete: SetNull)
+  fixed         FixedPricePolicy? @relation(fields: [fixedPricePolicyId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, status])
   @@index([driverProfileId])
@@ -198,11 +235,11 @@ model Payment {
   receiptNumber     String? // for the simplified monthly payment pdf receipt
   invoiceNumber     String?
   numberPeriod      String? // '202508' -> null until assigned
-  providerMetadata  Json?
 
   ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  receipts      Receipt[]
   webhookEvents WebhookEvent[]
 
   @@unique([tenantId, numberPeriod, receiptNumber])
@@ -211,6 +248,22 @@ model Payment {
   @@index([tenantId, capturedAt])
   @@index([tenantId, status, capturedAt])
   @@index([externalPaymentId])
+}
+
+model Receipt {
+  id        String    @id @default(uuid())
+  tenantId  String
+  rideId    String    @unique
+  paymentId String
+  publicId  String    @unique
+  status    String //DRAFT|ISSUED|VOID  
+  issuedAt  DateTime
+  expiresAt DateTime?
+  pdfUrl    String?
+  dataJson  Json
+
+  ride    Ride    @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 }
 
 model NumberSequence {
@@ -282,7 +335,7 @@ model WebhookEvent {
   attemptCount Int             @default(0)
   paymentId    String?
   rideId       String?
-  errorMessage  String?
+  errorMessage String?
 
   ride    Ride?    @relation(fields: [rideId], references: [id], onDelete: SetNull)
   payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)

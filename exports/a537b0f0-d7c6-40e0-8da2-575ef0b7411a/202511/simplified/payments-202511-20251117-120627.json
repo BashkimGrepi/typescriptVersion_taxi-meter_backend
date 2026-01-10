@@ -1,0 +1,145 @@
+{
+  "meta": {
+    "version": "payments-export/v1",
+    "type": "simplified",
+    "period": {
+      "from": "2025-11-01T00:00:00.000Z",
+      "to": "2025-12-01T00:00:00.000Z",
+      "yyyymm": "202511"
+    },
+    "tenant": {
+      "id": "a537b0f0-d7c6-40e0-8da2-575ef0b7411a",
+      "name": "MetroTaxi Oy",
+      "businessId": "1234567-8",
+      "vatId": null
+    },
+    "generatedAt": "2025-11-17T12:06:23.646Z",
+    "generatedBy": {
+      "userId": "aa9f4778-a420-4f36-a51d-ae9054f0c223",
+      "email": "admin@metrotaxi.test"
+    },
+    "numbering": {
+      "period": "202511",
+      "startingNumber": 5,
+      "endingNumber": 5,
+      "assignedCount": 0,
+      "alreadyNumberedCount": 4
+    }
+  },
+  "vat": {
+    "summaryByRate": [
+      {
+        "rate": 0.14,
+        "count": 4,
+        "base": "53.24",
+        "tax": "7.45",
+        "total": "60.69"
+      }
+    ],
+    "summaryByRateAndMethod": [
+      {
+        "rate": 0.14,
+        "count": 4,
+        "base": "53.24",
+        "tax": "7.45",
+        "total": "60.69"
+      }
+    ]
+  },
+  "payments": [
+    {
+      "paymentId": "c776d00c-60d7-4f1e-89a8-95c7d89641b3",
+      "receiptNumber": "202511-0003",
+      "capturedAt": "2025-11-13T11:37:00.851Z",
+      "serviceDate": "2025-11-13T11:36:18.947Z",
+      "description": "Passenger transport",
+      "rate": 0.14,
+      "base": "5.17",
+      "tax": "0.72",
+      "total": "5.89",
+      "currency": "EUR",
+      "driverName": "Anna Kuljettaja",
+      "rideId": "dd166c51-83f9-477b-9beb-2de41abe161c",
+      "externalPaymentId": "62541aaf-d277-4fbf-85af-62832b363a7a"
+    },
+    {
+      "paymentId": "67d90ec9-b200-4a6f-9943-b085f428d6c8",
+      "receiptNumber": "202511-0004",
+      "capturedAt": "2025-11-13T11:53:13.372Z",
+      "serviceDate": "2025-11-13T11:52:56.976Z",
+      "description": "Passenger transport",
+      "rate": 0.14,
+      "base": "5.17",
+      "tax": "0.72",
+      "total": "5.89",
+      "currency": "EUR",
+      "driverName": "Anna Kuljettaja",
+      "rideId": "74f2e869-2290-4d56-8981-3db2343c87d7",
+      "externalPaymentId": "339a74c1-eeca-4e75-88d1-e286fe9db7ee"
+    },
+    {
+      "paymentId": "85a7735a-c950-4eb7-8a9b-76fb1a8e81cd",
+      "receiptNumber": "202511-0005",
+      "capturedAt": "2025-11-13T12:35:45.959Z",
+      "serviceDate": "2025-11-13T12:25:32.717Z",
+      "description": "Passenger transport",
+      "rate": 0.14,
+      "base": "5.11",
+      "tax": "0.72",
+      "total": "5.83",
+      "currency": "EUR",
+      "driverName": "Anna Kuljettaja",
+      "rideId": "6927a8e4-6941-4604-b4be-72b27fd74cb2",
+      "externalPaymentId": "00e516a1-0cef-4ee8-b8db-0448453cc994"
+    },
+    {
+      "paymentId": "6bd056e9-ebb5-4633-b38d-f8787423bf13",
+      "receiptNumber": "R-202511-0002",
+      "capturedAt": "2025-11-01T01:27:00.000Z",
+      "serviceDate": "2025-11-01T01:27:00.000Z",
+      "description": "Passenger transport",
+      "rate": 0.14,
+      "base": "37.79",
+      "tax": "5.29",
+      "total": "43.08",
+      "currency": "EUR",
+      "driverName": "Anna Kuljettaja",
+      "rideId": "bc298dae-0525-4ccb-8c67-1f8603f8ad18",
+      "externalPaymentId": "viva_bc298dae"
+    }
+  ],
+  "exceptions": {
+    "ridesWithoutPayments": [
+      {
+        "rideId": "2d281070-5ca9-4345-b3e8-2ee4236d8c2e",
+        "endedAt": "2025-11-13T12:38:47.983Z"
+      },
+      {
+        "rideId": "9f33bf3b-08c7-4dc1-a59c-5a0673163a27",
+        "endedAt": "2025-11-13T12:58:51.793Z"
+      },
+      {
+        "rideId": "f4a13a07-fd80-4e46-81c8-b03b32d18521",
+        "endedAt": "2025-11-13T13:24:44.188Z"
+      },
+      {
+        "rideId": "04359657-b710-4950-9e1c-6419524315ce",
+        "endedAt": "2025-11-13T14:07:10.297Z"
+      },
+      {
+        "rideId": "53ff3e8f-80bf-48e2-bb54-2d6e98bd1866",
+        "endedAt": "2025-11-13T22:13:48.954Z"
+      },
+      {
+        "rideId": "5a8fc66f-8f0e-414d-987a-0db9a572ce98",
+        "endedAt": "2025-11-13T22:53:24.128Z"
+      }
+    ],
+    "paymentsWithoutRide": [],
+    "warnings": []
+  },
+  "annex": {
+    "enabled": false
+  },
+  "sha256": "20e702d2c0ceb6ebe92b76f8880116b2c04e33165cd793b8086f73a0f02f898a"
+}

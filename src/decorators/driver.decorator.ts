@@ -1,12 +1,12 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { createParamDecorator, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 
 export interface DriverInfo {
   userId: string;
-  email: string;
-  driverProfileId: string;
   tenantId: string;
-  role: string;
-  type: string;
+  tenantName: string;
+  driverProfileId: string;
+  role: "DRIVER";
+  type: 'access';
 }
 
 export const Driver = createParamDecorator(
@@ -16,14 +16,15 @@ export const Driver = createParamDecorator(
 
     // Ensure this is a driver user (check role and driverProfileId)
     if (!user || user.role !== 'DRIVER' || !user.driverProfileId) {
-      throw new Error('Not a driver user');
+      console.log('Not a driver user:', user);
+      throw new UnauthorizedException('Not a driver user');
     }
 
     return {
       userId: user.sub,
-      email: user.email,
-      driverProfileId: user.driverProfileId,
       tenantId: user.tenantId,
+      tenantName: user.tenantName,
+      driverProfileId: user.driverProfileId,
       role: user.role,
       type: user.type || 'access'
     };

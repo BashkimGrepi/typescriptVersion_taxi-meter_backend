@@ -1,4 +1,4 @@
-import { DriverProfile, RideStatus } from "@prisma/client";
+import { DriverProfile, RidePricingMode, RideStatus } from "@prisma/client";
 import { IsDateString, IsNumber, IsOptional, IsUUID, Min } from "class-validator";
 
 
@@ -21,47 +21,58 @@ export class EndRideDto {
 } 
 
 export class FareBreakdownDto {
-  base!: string;                // "3.00"
-  //timeComponent!: string;       // perMinute * duration
-  distanceComponent!: string;   // perKm * distance
-  surchargeMultiplier!: string; // "1.20"
-  subtotal!: string;            // before tax
-  taxAmount!: string;
-  total!: string;
-  currency!: string;            // "EUR"
-}
+  pricingMode!: RidePricingMode;  // Show which mode was used
+  
+  // For METER mode
+  base?: string;                 // "3.00" - only for METER
+  distanceComponent?: string;    // perKm * distance - only for METER  
+  timeComponent?: string;        // perMin * time - only for METER
+  surchargeMultiplier?: string;  // "1.20" - only for METER
+  
+  // For FIXED_PRICE mode
+  fixedAmount?: string;          // "25.00" - only for FIXED_PRICE
+  fixedPolicyName?: string;      // "Airport Run" - only for FIXED_PRICE
+  
+  // For CUSTOM_FIXED mode  
+  customAmount?: string;         // "30.00" - only for CUSTOM_FIXED
+  
+  // Common to all modes
+  subtotal!: string;             // before tax
+  taxAmount!: string;            // tax portion
+  total!: string;                // final amount
+  currency!: string;             // "EUR"
+}            
+
 
 
 
 export class EndRideResponseDto {
   rideId!: string;
-  status!: RideStatus;          // will be RideStatus.COMPLETED
+  status!: RideStatus;
 
   tenantId!: string;
   driverProfileId!: string;
-  pricingPolicyId!: string;
+  pricingMode!: RidePricingMode; // Show pricing mode used
 
-  startedAt!: string;           // ISO
-  endedAt!: string;             // ISO
+  // Mode-specific IDs
+  pricingPolicyId?: string; // For METER mode
+  fixedPricePolicyId?: string; // For FIXED_PRICE mode
+
+  startedAt!: string;
+  endedAt!: string;
   durationMinutes!: number;
   distanceKm!: number;
 
-  // flat fields you’ll aggregate in reports
-  fareSubtotal!: string;        // before tax
+  // Final amounts (same for all modes)
+  fareSubtotal!: string;
   taxAmount!: string;
   fareTotal!: string;
 
-  // optional detailed receipt for UI
+  // Enhanced fare breakdown
   fare?: FareBreakdownDto;
 
-
-  // payment fields for viva terminals use
-  paymentId: string;
-  paymentStatus: string;
-  externalPaymentId: string;
-
-  // NEW FIELDS for Viva Terminal integration
-  orderCode: string;      // will be same as rideId
-  amount: string;         // will be same as fareTotal
-  currency: string;       // will be "EUR"
+  // Payment fields
+  paymentId?: string;
+  paymentStatus?: string;
+  externalPaymentId?: string;
 }

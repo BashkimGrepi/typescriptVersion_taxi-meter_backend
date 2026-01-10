@@ -1,0 +1,88 @@
+{
+  "meta": {
+    "version": "payments-export/v1",
+    "type": "simplified",
+    "period": {
+      "from": "2025-11-01T00:00:00.000Z",
+      "to": "2025-12-01T00:00:00.000Z",
+      "yyyymm": "202511"
+    },
+    "tenant": {
+      "id": "550f37a1-9429-4651-bda3-6f7603df149e",
+      "name": "Helsinki Taxi Company",
+      "businessId": "1234567-8",
+      "vatId": null
+    },
+    "generatedAt": "2025-11-23T11:27:21.488Z",
+    "generatedBy": {
+      "userId": "a23c8960-b37a-4bef-88de-3f6429801ba0",
+      "email": "admin@helsinkitaxi.fi"
+    },
+    "numbering": {
+      "period": "202511",
+      "startingNumber": null,
+      "endingNumber": null,
+      "assignedCount": 0,
+      "alreadyNumberedCount": 1
+    }
+  },
+  "vat": {
+    "summaryByRate": [
+      {
+        "rate": 0.14,
+        "count": 1,
+        "base": "19.13",
+        "tax": "4.59",
+        "total": "23.72"
+      }
+    ],
+    "summaryByRateAndMethod": [
+      {
+        "rate": 0.14,
+        "count": 1,
+        "base": "19.13",
+        "tax": "4.59",
+        "total": "23.72"
+      }
+    ]
+  },
+  "payments": [
+    {
+      "paymentId": "4c8d0852-e43b-4627-a22a-d064e07633d7",
+      "receiptNumber": "001",
+      "capturedAt": "2025-11-18T10:50:00.000Z",
+      "serviceDate": "2025-11-18T10:48:00.000Z",
+      "description": "Passenger transport",
+      "rate": 0.14,
+      "base": "19.13",
+      "tax": "4.59",
+      "total": "23.72",
+      "currency": "EUR",
+      "driverName": "John Virtanen",
+      "rideId": "03597e30-d148-4f1b-be9b-d183022b6f96",
+      "externalPaymentId": "viva_tx_1234567890"
+    }
+  ],
+  "exceptions": {
+    "ridesWithoutPayments": [
+      {
+        "rideId": "51684726-4dff-49e6-b29c-909ed7eba0c4",
+        "endedAt": "2025-11-23T10:45:22.680Z"
+      },
+      {
+        "rideId": "63343373-52e7-454f-ab01-235c1c64796f",
+        "endedAt": "2025-11-23T11:07:10.014Z"
+      },
+      {
+        "rideId": "336e5aa1-a466-409e-a60c-09ec3af2e275",
+        "endedAt": "2025-11-23T11:16:06.161Z"
+      }
+    ],
+    "paymentsWithoutRide": [],
+    "warnings": []
+  },
+  "annex": {
+    "enabled": false
+  },
+  "sha256": "5ce4e9d274b553a9572123f5568cb4236960cfe9d355b0452496bbdd1cf9847e"
+}

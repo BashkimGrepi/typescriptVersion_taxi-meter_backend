@@ -2,7 +2,6 @@ import { Controller, Post, Body, UseGuards, Get, Request, Req } from '@nestjs/co
 import { AuthService } from '../auth.service';
 import { LoginDto } from '../dto/admin/login.dto';
 import { RegisterDto } from '../dto/admin/register.dto';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from 'src/decorators/public.decorator';
 import { UserResponseDto } from '../dto/common/user-response.dto';
 
@@ -27,5 +26,19 @@ export class AdminAuthController {
     return new UserResponseDto(req.user);
   }
 
- 
+  @Public()
+  @Post('select-tenant')
+  async selectTenant(@Body() dto: { loginTicket?: string; tenantId: string }, @Req() req) {
+    const fromHeader = req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.slice(7)
+      : undefined;
+
+    return this.authService.selectTenant({
+      loginTicket: dto.loginTicket ?? fromHeader,
+      tenantId: dto.tenantId,
+    });
+  }
+
+
+  // logout endpoint to revoke tokens
 }

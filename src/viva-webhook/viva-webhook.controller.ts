@@ -1,16 +1,21 @@
-import { Body, Controller, Get, Header, HttpStatus, Logger, Param, Post, Res, UseGuards, UsePipes, ValidationPipe } from "@nestjs/common";
-import express, { request } from "express";
-import { VivaWebhookService } from "./viva-webhook.service";
-import { Public } from "src/decorators/public.decorator";
-import { VivaWebhookPayload } from "./viva-webhook.dto";
-import { error } from "console";
-import { stat } from "fs";
-import { JwtValidationResult } from "src/auth/interfaces/jwt-payload.interface";
-import { DriverV1Guard } from "src/auth/guards/driver-v1.guard";
-import { PaymentVerificationResponseDto } from "src/payments/types/payments";
-
-
-
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpStatus,
+  Logger,
+  Post,
+  Res,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
+import express from 'express';
+import { VivaWebhookService } from './viva-webhook.service';
+import { Public } from 'src/decorators/public.decorator';
+import { VivaWebhookPayload } from './viva-webhook.dto';
+import { error } from 'console';
+import { stat } from 'fs';
 
 @Controller('api/webhooks/viva')
 export class VivaWebhookController {
@@ -38,18 +43,17 @@ export class VivaWebhookController {
 
   @Public()
   @Post()
-  @UsePipes(
-    new ValidationPipe({ whitelist: false, forbidNonWhitelisted: false }),
-  )
-  async processWebhook(
-    @Body() payload: VivaWebhookPayload,
-    @Res() res: express.Response,
-  ) {
+  async processWebhook(@Body() payload: any, @Res() res: express.Response) {
     try {
-      this.logger.log('Received viva webhook payload:', {
-        eventType: payload.EventTypeId,
-        transactionId: payload.EventData.TransactionId,
-      });
+      this.logger.log(
+        'Received viva webhook payload:',
+        JSON.stringify(payload, null, 2),
+      );
+
+      // Basic validation before processing
+      if (!payload || typeof payload !== 'object') {
+        throw new Error('Invalid payload: not an object');
+      }
 
       //process the webhook payload
       await this.service.processPaymentCreatedEvent(payload);
@@ -67,5 +71,4 @@ export class VivaWebhookController {
       });
     }
   }
-
 }

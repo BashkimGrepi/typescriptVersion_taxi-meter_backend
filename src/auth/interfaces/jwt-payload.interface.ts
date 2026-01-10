@@ -1,11 +1,13 @@
 
 
 
-export interface DriverAccessJwtPayloadV1 {
-    sub: string;        // userId
+export interface UnifiedJwtPayload {
+    sub: string;
+    email: string; // user email
     tenantId: string;   // tenantId
-    driverProfileId: string; // driverProfileId
-    role: "DRIVER"; // role is always DRIVER for this payload
+    tenantName: string; // tenantName
+    driverProfileId?: string; // driverProfileId
+    role: "DRIVER" | "ADMIN" | "MANAGER"; // user role
     type: "access"; // token type
     aud: string;    // JWT audience
     iss: string;    // JWT issuer
@@ -15,10 +17,14 @@ export interface DriverAccessJwtPayloadV1 {
     ver: 1;          // version of the payload structureg
 }
 
+
+// maybe later
 export interface JwtValidationResult {
     sub: string;        
     tenantId: string;
+    email: string;
+    tenantName: string;
     driverProfileId: string;
-    role: "DRIVER";
+    role: "DRIVER" | "ADMIN" | "MANAGER";
     jti?: string;    // optional JWT ID
 }

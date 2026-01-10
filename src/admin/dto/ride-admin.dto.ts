@@ -1,13 +1,30 @@
-import { IsOptional, IsString, IsEnum, IsInt, Min, Max, IsDateString, IsUUID } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsInt,
+  Min,
+  Max,
+  IsDateString,
+  IsUUID,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  PaymentProvider,
+  PaymentStatus,
+  Ride,
+  RidePricingMode,
+  RideStatus,
+} from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 export enum RideStatusFilter {
   DRAFT = 'DRAFT',
-  ONGOING = 'ONGOING', 
+  ONGOING = 'ONGOING',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
-  ALL = 'ALL'
+  ALL = 'ALL',
 }
 
 export class RidesQueryDto {
@@ -21,7 +38,10 @@ export class RidesQueryDto {
   @IsDateString()
   to?: string;
 
-  @ApiPropertyOptional({ enum: RideStatusFilter, default: RideStatusFilter.ALL })
+  @ApiPropertyOptional({
+    enum: RideStatusFilter,
+    default: RideStatusFilter.ALL,
+  })
   @IsOptional()
   @IsEnum(RideStatusFilter)
   status?: RideStatusFilter;
@@ -30,6 +50,27 @@ export class RidesQueryDto {
   @IsOptional()
   @IsUUID()
   driverId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by driver name (partial match)' })
+  @IsOptional()
+  @IsString()
+  driverName?: string;
+
+  @ApiPropertyOptional({
+    enum: PaymentStatus,
+    description: 'Filter by payment status',
+  })
+  @IsOptional()
+  @IsEnum(PaymentStatus)
+  paymentStatus?: PaymentStatus;
+
+  @ApiPropertyOptional({
+    enum: PaymentProvider,
+    description: 'Filter by payment provider/method',
+  })
+  @IsOptional()
+  @IsEnum(PaymentProvider)
+  paymentProvider?: PaymentProvider;
 
   @ApiPropertyOptional({ description: 'Page number (1-based)', default: 1 })
   @IsOptional()
@@ -47,24 +88,52 @@ export class RidesQueryDto {
   pageSize?: number = 25;
 }
 
-export interface RideResponseDto {
-  id: string;
-  tenantId: string;
-  driverProfileId: string;
-  startedAt: string;
-  endedAt?: string;
-  durationMin?: string;
-  distanceKm?: string;
-  fareSubtotal?: string;
-  taxAmount?: string;
-  fareTotal?: string;
-  status: string;
-  createdAt: string;
+export interface RideListItemDto {
+  rideId: string;
+  driverName: string;
+  date: string; // startedAt ISO string
+  rideStatus: RideStatus;
+  paymentStatus: PaymentStatus | null;
+  paymentMethod: PaymentProvider | null;
+  amount: string | null; // fareTotal as string
 }
 
-export interface RidesPageResponse {
-  items: RideResponseDto[];
+export interface RidePageResponse {
+  items: RideListItemDto[];
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface RideSummaryResponseDto {
+  ride: {
+    id: string;
+    startedAt: string;
+    endedAt: string | null;
+    durationMin: string | null;
+    distanceKm: string | null;
+    faresubtotal: Decimal | null;
+    taxAmount: Decimal | null;
+    fareTotal: Decimal | null;
+    status: RideStatus;
+    pricingMode: RidePricingMode;
+  },
+  driver: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  },
+  tenant: {
+    id: string;
+    tenantName: string;
+  },
+  payment: {
+    id: string;
+    provider: PaymentProvider;
+    amount: Decimal;
+    currency: string;
+    status: PaymentStatus;
+    
+  }
+
 }

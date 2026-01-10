@@ -1,29 +1,57 @@
-import { PaymentStatus, RideStatus } from "@prisma/client";
+import { PaymentStatus, RidePricingMode, RideStatus } from "@prisma/client";
 import { FareBreakdownDto } from "./EndRideDto";
 
 export interface RideDetailsDto {
     id: string;
     status: RideStatus;
-    timing: {
-        startedAt: string;   // ISO string
-        endedAt?: string;    // ISO string or null
-        duration: string;
+    pricingMode: RidePricingMode;
+    timing: Timing;
+    distance: Distance;
+    fare: Fare;
+    pricingInfo?: PricingInfo;
+    payment?: Payment;
+}
+
+interface Timing {
+    startedAt: string;   // ISO string
+    endedAt?: string;    // ISO string or null
+    duration: string;
+}
+
+interface Distance {
+    totalKm: string;
+    displayKm: string;
+}
+
+interface Fare {
+    subtotal: string;
+    tax: string;
+    total: string;
+    currency: string;
+    breakdown: FareBreakdownDto;
+}
+
+interface PricingInfo {
+    meterPolicy?: {
+        name: string;
+        baseFare: string;
+        perKm: string;
+        perMin: string;
     };
-    distance: {
-        totalKm: string;
-        displayKm: string;
+    fixedPricePolicy?: {
+        name: string;
+        amount: string;
+        isPersonal?: boolean;
     };
-    fare: {
-        subtotal: string;
-        tax: string;
-        total: string;
-        currency: string;
-        breakdown: FareBreakdownDto;
+    customFare?: {
+        amount: string;
+        note: string; // "Driver set custom fare"
     };
-    payment?: {
-        id: string;
-        status: PaymentStatus;
-        method?: string;
-        externalId?: string;
-    };
+};
+
+interface Payment {
+    id: string;
+    status: PaymentStatus;
+    method?: string;
+    externalId?: string;
 }

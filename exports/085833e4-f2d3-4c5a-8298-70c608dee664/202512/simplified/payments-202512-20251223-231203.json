@@ -1,0 +1,184 @@
+{
+  "meta": {
+    "version": "payments-export/v1",
+    "type": "simplified",
+    "period": {
+      "from": "2025-12-01T00:00:00.000Z",
+      "to": "2026-01-01T00:00:00.000Z",
+      "yyyymm": "202512"
+    },
+    "tenant": {
+      "id": "085833e4-f2d3-4c5a-8298-70c608dee664",
+      "name": "Helsinki Taxi Company",
+      "businessId": "1234567-8",
+      "vatId": null
+    },
+    "generatedAt": "2025-12-23T23:12:00.697Z",
+    "generatedBy": {
+      "userId": "6bb3c0cd-5d07-47d9-aaf6-86c5af45eaff",
+      "email": "admin@helsinkitaxi.fi"
+    },
+    "numbering": {
+      "period": "202512",
+      "startingNumber": null,
+      "endingNumber": null,
+      "assignedCount": 0,
+      "alreadyNumberedCount": 0
+    }
+  },
+  "vat": {
+    "summaryByRate": [],
+    "summaryByRateAndMethod": []
+  },
+  "payments": [],
+  "exceptions": {
+    "ridesWithoutPayments": [
+      {
+        "rideId": "11a96952-ac94-4784-b4de-1b425999df0b",
+        "endedAt": "2025-12-02T22:47:40.374Z"
+      },
+      {
+        "rideId": "6bfbd3c2-585b-4d88-81c6-b12a1c013003",
+        "endedAt": "2025-12-03T09:04:20.876Z"
+      },
+      {
+        "rideId": "eeeea185-ca35-44aa-b105-294823ad5667",
+        "endedAt": "2025-12-03T09:08:09.243Z"
+      },
+      {
+        "rideId": "34ffe18e-3e87-4aeb-b6b1-6054171a8ec1",
+        "endedAt": "2025-12-03T14:41:20.648Z"
+      },
+      {
+        "rideId": "40eba257-a00a-4908-b407-135e95201a7d",
+        "endedAt": "2025-12-04T13:52:57.558Z"
+      },
+      {
+        "rideId": "9b59d6d1-532c-4adf-880c-a4c1c047fbdd",
+        "endedAt": "2025-12-04T14:51:45.345Z"
+      },
+      {
+        "rideId": "a826d224-8354-4353-8dba-499121f74c4b",
+        "endedAt": "2025-12-04T14:56:16.029Z"
+      },
+      {
+        "rideId": "e42e8503-27bd-4ec7-b143-6ece2488218e",
+        "endedAt": "2025-12-05T12:52:41.476Z"
+      },
+      {
+        "rideId": "03b80317-9539-4815-9c80-d9996f893345",
+        "endedAt": "2025-12-13T17:07:46.059Z"
+      },
+      {
+        "rideId": "a1d21f02-bed2-43b9-bb5f-210e82dcb7fa",
+        "endedAt": "2025-12-14T22:18:28.929Z"
+      },
+      {
+        "rideId": "b906b998-177a-4791-97ac-061d834960a8",
+        "endedAt": "2025-12-15T20:44:45.510Z"
+      },
+      {
+        "rideId": "4f43799b-2a60-40bb-ae09-6e243aa4acb4",
+        "endedAt": "2025-12-15T23:44:25.676Z"
+      },
+      {
+        "rideId": "6472db0d-88a2-4d5a-8617-61189a9a1148",
+        "endedAt": "2025-12-16T01:02:38.039Z"
+      },
+      {
+        "rideId": "d455658b-1964-41a9-8c9f-c48521b5433a",
+        "endedAt": "2025-12-16T11:57:47.723Z"
+      },
+      {
+        "rideId": "1454e058-28a0-447b-8387-c69b6c1530cc",
+        "endedAt": "2025-12-16T12:02:15.950Z"
+      },
+      {
+        "rideId": "f5172336-53f7-4c74-89dc-c4fc8ed78d56",
+        "endedAt": "2025-12-16T12:06:38.987Z"
+      },
+      {
+        "rideId": "1f5fbb98-68e3-4fc9-93f3-015ebb27396e",
+        "endedAt": "2025-12-17T17:20:14.573Z"
+      },
+      {
+        "rideId": "30d83e7f-3c69-4fc7-9800-9c306d20a976",
+        "endedAt": "2025-12-17T20:44:59.026Z"
+      },
+      {
+        "rideId": "132e9676-e8a9-4a3d-80b0-efc72b8cffa0",
+        "endedAt": "2025-12-17T22:21:39.330Z"
+      },
+      {
+        "rideId": "935be506-35e1-42e8-845c-beff2e9505d5",
+        "endedAt": "2025-12-17T22:36:34.562Z"
+      },
+      {
+        "rideId": "cc13d446-8ce2-48e5-a2b6-0ad93a180fc8",
+        "endedAt": "2025-12-18T14:22:23.462Z"
+      },
+      {
+        "rideId": "4b8bd7a1-474b-4591-8ab3-3ff56c4b262f",
+        "endedAt": "2025-12-18T14:24:38.708Z"
+      },
+      {
+        "rideId": "193287d5-fd36-4707-af1b-20f484659804",
+        "endedAt": "2025-12-18T14:25:50.776Z"
+      },
+      {
+        "rideId": "9c906aed-02f6-4d01-a22e-2afaeb71f80f",
+        "endedAt": "2025-12-18T14:27:56.354Z"
+      },
+      {
+        "rideId": "39bb07f1-7be2-4002-94a9-3774167a8352",
+        "endedAt": "2025-12-18T14:29:25.759Z"
+      },
+      {
+        "rideId": "260f5c66-82a8-4b54-95dd-39d2d49c4eac",
+        "endedAt": "2025-12-18T14:30:11.093Z"
+      },
+      {
+        "rideId": "d5d38d2b-5ba5-4381-8175-0819a4a4b7d9",
+        "endedAt": "2025-12-18T14:36:32.369Z"
+      },
+      {
+        "rideId": "6f7e77f1-0d52-401d-ad54-d593abb6f701",
+        "endedAt": "2025-12-18T14:41:24.059Z"
+      },
+      {
+        "rideId": "389a7404-3f84-4e98-ac7e-066b6e3e14c2",
+        "endedAt": "2025-12-18T15:17:41.232Z"
+      },
+      {
+        "rideId": "375976c6-4473-46ed-a7ef-1e76272a4a6b",
+        "endedAt": "2025-12-18T15:30:14.537Z"
+      },
+      {
+        "rideId": "f78e62a9-217b-4474-b320-3d7c51af802a",
+        "endedAt": "2025-12-19T20:00:07.389Z"
+      },
+      {
+        "rideId": "d5f5a453-f9f8-4e5e-abdf-7e082a62ceb7",
+        "endedAt": "2025-12-19T20:10:42.816Z"
+      },
+      {
+        "rideId": "13569aeb-8f67-49cc-9654-f931ba6c40ed",
+        "endedAt": "2025-12-19T20:12:49.571Z"
+      },
+      {
+        "rideId": "fc7ff9b5-167b-4c10-a6bb-e1f9bf34b4a7",
+        "endedAt": "2025-12-21T13:09:02.380Z"
+      },
+      {
+        "rideId": "e989b5ff-f83d-45cd-add1-b75689faa9bf",
+        "endedAt": "2025-12-23T23:05:22.756Z"
+      }
+    ],
+    "paymentsWithoutRide": [],
+    "warnings": []
+  },
+  "annex": {
+    "enabled": false
+  },
+  "sha256": "eaef6fef7d4aba637933da268c8c585b707ce56f8075025c5a90309c6535e45d"
+}

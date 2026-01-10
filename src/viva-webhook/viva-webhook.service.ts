@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { VivaWebhookPayload } from './viva-webhook.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PaymentStatus } from '@prisma/client';
@@ -84,13 +84,12 @@ export class VivaWebhookService {
       return { status: 'error', reason: 'merchant_id_mismatch' };
     }
 
-    // find the payment by orderCode (ride id) - handle race conditions
+    // find the payment by orderCode (id)
     const payment = await this.prisma.payment.findFirst({
       where: {
-        rideId: OrderCode.toString(),
-        status: {
-          in: [PaymentStatus.PENDING, PaymentStatus.SUBMITTED], // Handle both states
-        },
+        id: OrderCode.toString(),
+        status: PaymentStatus.PENDING,
+        // NEEDS TENANT CHECK
       },
     });
     if (!payment) {
@@ -113,8 +112,7 @@ export class VivaWebhookService {
       return { status: 'ignored', reason: 'amount_mismatch' };
     }
 
-    // update payment to paid (safe transition from PENDING or SUBMITTED)
-    const previousStatus = payment.status;
+    // update payment to paid
     await this.prisma.payment.update({
       where: { id: payment.id },
       data: {
@@ -123,7 +121,6 @@ export class VivaWebhookService {
         capturedAt: new Date(),
       },
     });
-
     // mark webhook as processed
     await this.prisma.webhookEvent.update({
       where: { id: webhookEvent.id },
@@ -136,15 +133,30 @@ export class VivaWebhookService {
 
     this.logger.log('Payment successfully updated to PAID', {
       paymentId: payment.id,
-      rideId: OrderCode,
+      id: OrderCode,
       transactionId: TransactionId,
       amount: Amount,
-      previousStatus: previousStatus, // Track what status it came from
-      transition: `${previousStatus} → PAID`, // Clear transition logging
     });
+    return { status: 'ok', paymentId: payment.id };
   }
 
-  // Helper to mark webhook as failed with optional processed flag
+  /*
+  markWebhookFailed semantics
+
+    You sometimes call markWebhookFailed with markAsProcessed left as false (the default), e.g. for merchant mismatch, amount mismatch.
+
+    That means:
+
+    attemptCount increments,
+
+    errorMessage is stored,
+
+    but processedAt is not set.
+
+    So if you later add retry logic, those will keep retrying even though the error is probably permanent (e.g. misconfig of MerchantId or wrong OrderCode).
+
+    Not a bug now, but something to keep in mind when you implement retries.
+  */
   async markWebhookFailed(
     webhookId: string,
     errorMessage: string,

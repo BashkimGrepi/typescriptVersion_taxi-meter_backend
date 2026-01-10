@@ -1,40 +1,43 @@
-import { Injectable, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { 
-  CreateDriverDto, 
-  UpdateDriverDto, 
-  DriversQueryDto, 
-  DriverResponseDto, 
+import {
+  CreateDriverDto,
+  UpdateDriverDto,
+  DriversQueryDto,
+  DriverResponseDto,
   DriversPageResponse,
-  DriverStatus 
+  DriverStatus,
 } from '../dto/driver-admin.dto';
-import { REQUEST } from '@nestjs/core';
-import { request } from 'express';
-import { TenantScopedService } from 'src/common/services/tenant-scoped.service';
 
 @Injectable()
-export class AdminDriverService extends TenantScopedService {
-  constructor(
-    @Inject(REQUEST) request: Express.Request,
-    @Inject(PrismaService) private prisma: PrismaService,
-  ) {
-    super(request);
-  }
+export class AdminDriverService {
+  constructor(private prisma: PrismaService) {}
 
-  async getDrivers(query: DriversQueryDto): Promise<DriversPageResponse> {
-    const tenantId = this.getCurrentTenantId();
+  async getDrivers(
+    tenantId: string,
+    query: DriversQueryDto,
+  ): Promise<DriversPageResponse> {
     const { q, status, page = 1, pageSize = 25 } = query;
-    
+
     const where = {
       tenantId,
-      ...(status && status !== DriverStatus.ALL ? { status: status as any } : {}),
-      ...(q ? {
-        OR: [
-          { firstName: { contains: q, mode: 'insensitive' as any } },
-          { lastName: { contains: q, mode: 'insensitive' as any } },
-          { phone: { contains: q } },
-        ],
-      } : {}),
+      ...(status && status !== DriverStatus.ALL
+        ? { status: status as any }
+        : {}),
+      ...(q
+        ? {
+            OR: [
+              { firstName: { contains: q, mode: 'insensitive' as any } },
+              { lastName: { contains: q, mode: 'insensitive' as any } },
+              { phone: { contains: q } },
+              { email: { contains: q, mode: 'insensitive' as any } },
+            ],
+          }
+        : {}),
     };
 
     const [items, total] = await this.prisma.$transaction([
@@ -48,6 +51,7 @@ export class AdminDriverService extends TenantScopedService {
           firstName: true,
           lastName: true,
           phone: true,
+          email: true,
           userId: true,
           status: true,
         },
@@ -56,10 +60,11 @@ export class AdminDriverService extends TenantScopedService {
     ]);
 
     return {
-      items: items.map(item => ({
+      items: items.map((item) => ({
         ...item,
-        phone: item.phone || undefined,
-        userId: item.userId || undefined,
+        email: item.email,
+        phone: item.phone || '',
+        userId: item.userId || '',
         createdAt: new Date().toISOString(), // Placeholder since createdAt doesn't exist in schema
       })),
       total,
@@ -68,14 +73,13 @@ export class AdminDriverService extends TenantScopedService {
     };
   }
 
-  async createDriver(data: CreateDriverDto): Promise<DriverResponseDto> {
-    const tenantId = this.getCurrentTenantId();
-    const userId = this.getCurrentUserId();
-
+  async createDriver(
+    tenantId: string,
+    data: CreateDriverDto,
+  ): Promise<DriverResponseDto> {
     const driver = await this.prisma.driverProfile.create({
       data: {
         tenantId,
-        userId,
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone,
@@ -87,6 +91,7 @@ export class AdminDriverService extends TenantScopedService {
         tenantId: true,
         firstName: true,
         lastName: true,
+        email: true,
         phone: true,
         userId: true,
         status: true,
@@ -95,18 +100,18 @@ export class AdminDriverService extends TenantScopedService {
 
     return {
       ...driver,
-      phone: driver.phone || undefined,
-      userId: driver.userId || undefined,
+      email: driver.email,
+      phone: driver.phone || '',
+      userId: driver.userId || '',
       createdAt: new Date().toISOString(),
     };
   }
 
   async updateDriver(
-   
-    driverId: string, 
-    data: UpdateDriverDto
+    tenantId: string,
+    driverId: string,
+    data: UpdateDriverDto,
   ): Promise<DriverResponseDto> {
-    const tenantId = this.getCurrentTenantId();
     // First check if driver exists and belongs to tenant
     const existingDriver = await this.prisma.driverProfile.findFirst({
       where: { id: driverId, tenantId },
@@ -121,6 +126,7 @@ export class AdminDriverService extends TenantScopedService {
       data: {
         ...(data.firstName && { firstName: data.firstName }),
         ...(data.lastName && { lastName: data.lastName }),
+        ...(data.email && { email: data.email }),
         ...(data.phone !== undefined && { phone: data.phone }),
         ...(data.status && { status: data.status }),
       },
@@ -129,6 +135,7 @@ export class AdminDriverService extends TenantScopedService {
         tenantId: true,
         firstName: true,
         lastName: true,
+        email: true,
         phone: true,
         userId: true,
         status: true,
@@ -136,9 +143,14 @@ export class AdminDriverService extends TenantScopedService {
     });
 
     return {
-      ...updatedDriver,
-      phone: updatedDriver.phone || undefined,
-      userId: updatedDriver.userId || undefined,
+      id: updatedDriver.id,
+      tenantId: updatedDriver.tenantId,
+      firstName: updatedDriver.firstName,
+      lastName: updatedDriver.lastName,
+      email: updatedDriver.email,
+      phone: updatedDriver.phone || '',
+      userId: updatedDriver.userId || '',
+      status: updatedDriver.status,
       createdAt: new Date().toISOString(),
     };
   }
