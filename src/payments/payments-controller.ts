@@ -27,15 +27,13 @@ export class PaymentsController {
     return this.service.getPaymentById(paymentId);
   }
 
-  // Confirm payment with cash method ->> needs modification in the service
-  @Post(':id/confirm/cash')
-  async confirmDriverPayment(
-    @Param('id') paymentId: string,
-    @Body() dto: payments.ConfirmPaymentDto,
+
+  @Post(":id/confirm/cash")
+  async confirmDriverPaymentCash(
+    @Param("id") paymentId: string,
     @Request() req: any,
   ) {
-    // confirms payment by id
-    // sets status "paid" and capturedAt = now
-    return this.service.confirmPayment(paymentId, req.user, dto);
+    const user = req.user;
+    return this.service.cashPayment(paymentId, user);
   }
 }

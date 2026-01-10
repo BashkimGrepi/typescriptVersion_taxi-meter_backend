@@ -6,6 +6,7 @@ import {
 import { JwtValidationResult } from 'src/auth/interfaces/jwt-payload.interface';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfirmPaymentDto } from './types/payments';
+import { PaymentProvider, PaymentStatus } from '@prisma/client';
 
 @Injectable()
 export class PaymentsService {
@@ -92,6 +93,7 @@ export class PaymentsService {
         currency: true,
         externalPaymentId: true,
         rideId: true,
+        provider: true,
       },
     });
 
@@ -110,6 +112,7 @@ export class PaymentsService {
         externalPaymentId: currentPayment.externalPaymentId || undefined,
         capturedAt: currentPayment.capturedAt?.toISOString(),
         message: 'Payment already confirmed',
+        provider: currentPayment.provider,
       };
     }
 
@@ -159,5 +162,67 @@ export class PaymentsService {
 
 
 
-  
+  async cashPayment(
+    paymentId: string,
+    user: JwtValidationResult,
+  ) {
+    
+    await this.validatePaymentAccess(paymentId, user);
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: {
+        id: true,
+        status: true,
+        capturedAt: true,
+        amount: true,
+        rideId: true,
+        provider: true,
+      },
+    });
+
+    if (!payment) throw new NotFoundException('Payment not found');
+
+    if (payment.status === 'PAID') {
+      return {
+        paymentId: payment.id,
+        rideId: payment.rideId,
+        amount: payment.amount.toString(),
+        status: payment.status,
+        capturedAt: payment.capturedAt?.toISOString(),
+        provider: payment.provider,
+      }
+    }
+
+    // check how you handle the other payment statuses.
+
+    const updatedPayment = await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: PaymentStatus.PAID,
+        authorizedAt: new Date(),
+        capturedAt: new Date(),
+        provider: PaymentProvider.CASH,
+      },
+      select: {
+        id: true,
+        rideId: true,
+        amount: true,
+        status: true,
+        capturedAt: true,
+        provider: true,
+      },
+    });
+   
+
+
+    return {
+      paymentId: updatedPayment.id,
+      rideId: updatedPayment.rideId,
+      amount: updatedPayment.amount.toString(),
+      status: updatedPayment.status,
+      capturedAt: updatedPayment.capturedAt?.toISOString(),
+      provider: updatedPayment.provider,
+    }
+  }
 }

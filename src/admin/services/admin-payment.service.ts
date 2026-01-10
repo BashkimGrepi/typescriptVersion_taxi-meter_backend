@@ -18,7 +18,6 @@ export class AdminPaymentService {
     const {
       from,
       to,
-      paymentMethod,
       driverId,
       minAmount,
       maxAmount,
@@ -172,7 +171,7 @@ export class AdminPaymentService {
     }
 
     // Map paymentMethod to provider enum
-    const provider = paymentMethod === 'card' ? PaymentProvider.STRIPE : PaymentProvider.VIVA;
+    const provider = paymentMethod === 'VIVA' ? PaymentProvider.VIVA : PaymentProvider.CASH;
 
     // Create the payment
     const payment = await this.prisma.payment.create({
@@ -225,7 +224,7 @@ export class AdminPaymentService {
     }
     
     if (updatePaymentDto.paymentMethod !== undefined) {
-      updateData.provider = updatePaymentDto.paymentMethod === 'card' ? PaymentProvider.STRIPE : PaymentProvider.VIVA;
+      updateData.provider = updatePaymentDto.paymentMethod === 'VIVA' ? PaymentProvider.VIVA : PaymentProvider.CASH;
     }
     
     if (updatePaymentDto.notes !== undefined) {

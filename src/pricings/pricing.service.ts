@@ -3,7 +3,7 @@ import ListPricingPoliciesDto, {
   CreatePricingPolicyDto,
   UpdatePricingPolicyDto,
 } from './dto/pricing-policies.dto';
-import { Prisma } from '@prisma/client';
+import { Prisma, RidePricingMode } from '@prisma/client';
 import { ignoreElements, NotFoundError } from 'rxjs';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { basename } from 'path';
@@ -477,6 +477,7 @@ export class PricingService {
         baseFare: activeMeterPolicy.baseFare.toString(),
         perKm: activeMeterPolicy.perKm.toString(),
         perMin: activeMeterPolicy.perMin.toString(),
+        mode: RidePricingMode.METER,
         tenant: {
           id: activeMeterPolicy.tenant.id,
           name: activeMeterPolicy.tenant.name,
@@ -487,6 +488,7 @@ export class PricingService {
         id: fp.id,
         name: fp.name,
         amount: fp.amount.toString(),
+        mode: RidePricingMode.FIXED_PRICE,
         tenant: {
           id: fp.tenant.id,
           name: fp.tenant.name,
@@ -497,6 +499,7 @@ export class PricingService {
         minAmount: customFixedOption.minAmount,
         maxAmount: customFixedOption.maxAmount,
         description: customFixedOption.description,
+        mode: RidePricingMode.CUSTOM_FIXED,
       }
     }
   }

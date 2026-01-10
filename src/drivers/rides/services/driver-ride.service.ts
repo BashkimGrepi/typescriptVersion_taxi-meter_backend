@@ -882,11 +882,12 @@ export class DriverRideService {
       throw new NotFoundException('Fixed price policy not found or inactive');
     }
 
-    // Fixed price is the subtotal (before tax)
-    const subtotal = new Prisma.Decimal(fixedPolicy.amount);
+    // Fixed price is the total (with tax)
     const taxRate = new Prisma.Decimal(process.env.DEFAULT_TAX_RATE ?? '0.14');
-    const tax = subtotal.mul(taxRate).toDP(2);
-    const total = subtotal.add(tax).toDP(2);
+    //const tax = subtotal.mul(taxRate).toDP(2);
+    const total = new Prisma.Decimal(fixedPolicy.amount);
+    const tax = total.mul(taxRate).toDP(2);
+    const subtotal = total.sub(tax).toDP(2);
 
     return {
       subtotal,

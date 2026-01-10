@@ -21,7 +21,7 @@ enum RideStatus {
 }
 
 enum PaymentProvider {
-  STRIPE
+  CASH
   VIVA
 }
 
@@ -167,11 +167,12 @@ model PricingPolicy {
 }
 
 model FixedPricePolicy {
-  id              String   @id @default(uuid())
+  id              String  @id @default(uuid())
   tenantId        String
   driverProfileId String? // null = tenant-wide tariff; not null = personal
   name            String // e.g. "Airport flat rate"
-  amount          Decimal  @db.Decimal(10, 2) // total price incl. VAT
+  amount          Decimal @db.Decimal(10, 2) // total price incl. VAT
+
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   createdByUserId String?
@@ -203,6 +204,7 @@ model Ride {
   customFixedFare    Decimal?        @db.Decimal(10, 2) // for  CUSTOM_FIXED
 
   payment       Payment?
+  receipts      Receipt[]
   links         PaymentLink[]
   webhookEvents WebhookEvent[]
 
@@ -237,6 +239,7 @@ model Payment {
   ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  receipts      Receipt[]
   webhookEvents WebhookEvent[]
 
   @@unique([tenantId, numberPeriod, receiptNumber])
@@ -245,6 +248,22 @@ model Payment {
   @@index([tenantId, capturedAt])
   @@index([tenantId, status, capturedAt])
   @@index([externalPaymentId])
+}
+
+model Receipt {
+  id        String    @id @default(uuid())
+  tenantId  String
+  rideId    String    @unique
+  paymentId String
+  publicId  String    @unique
+  status    String //DRAFT|ISSUED|VOID  
+  issuedAt  DateTime
+  expiresAt DateTime?
+  pdfUrl    String?
+  dataJson  Json
+
+  ride    Ride    @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 }
 
 model NumberSequence {

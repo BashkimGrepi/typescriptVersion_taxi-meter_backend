@@ -19,6 +19,7 @@ import { AdminInvitationController } from './controllers/admin-invitation.contro
 import { AdminPaymentController } from './controllers/admin-payment.controller';
 import { AdminReportController } from './controllers/admin-report.controller';
 import { AdminProfileController } from './controllers/admin-profile.controller';
+import { AdminRideController } from './controllers/admin-ride.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -39,7 +40,8 @@ import { AdminProfileController } from './controllers/admin-profile.controller';
     AdminInvitationController,
     AdminPaymentController,
     AdminReportController,
-    AdminProfileController
+    AdminProfileController,
+    AdminRideController,
   ],
   exports: [
     // Export services if needed by other modules

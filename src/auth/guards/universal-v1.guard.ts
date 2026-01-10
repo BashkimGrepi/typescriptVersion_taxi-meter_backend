@@ -28,6 +28,7 @@ export class UniversalV1Guard
       context.getClass(),
     ]);
 
+    console.log("isPublic:", isPublic);
     if (isPublic) {
       this.logger.log(
         'UniversalV1Guard - Public endpoint, skipping authentication',
@@ -35,6 +36,7 @@ export class UniversalV1Guard
       return true; // skip authentication for @Public() endpoints
     }
 
+    console.log("part 2");
     // 2. For protected endpoints, run JWT authentication
     try {
       this.logger.log(
@@ -42,12 +44,13 @@ export class UniversalV1Guard
       );
 
       const result = await super.canActivate(context);
-
+      console.log("part 3,", result);
       if (!result) {
         this.logger.warn('UniversalV1Guard - JWT Authentication failed');
         return false;
       }
 
+      console.log("part 4");
       const request = context.switchToHttp().getRequest();
       const user: JwtValidationResult = request.user;
 
