@@ -58,13 +58,11 @@ async function main() {
     where: { email: 'admin@helsinkitaxi.fi' },
     create: {
       email: 'admin@helsinkitaxi.fi',
-      username: 'admin',
       passwordHash: adminPasswordHash,
       status: 'ACTIVE',
     },
     update: {
       status: 'ACTIVE',
-      username: 'admin',
     },
   });
   console.log('✅ Using admin user:', adminUser.email);
@@ -75,13 +73,11 @@ async function main() {
     where: { email: 'john.driver@helsinkitaxi.fi' },
     create: {
       email: 'john.driver@helsinkitaxi.fi',
-      username: 'johndriver',
       passwordHash: driverPasswordHash,
       status: 'ACTIVE',
     },
     update: {
       status: 'ACTIVE',
-      username: 'johndriver',
     },
   });
   console.log('✅ Using driver user:', driverUser.email);
@@ -92,18 +88,16 @@ async function main() {
     where: { email: 'maria.driver@helsinkitaxi.fi' },
     create: {
       email: 'maria.driver@helsinkitaxi.fi',
-      username: 'mariadriver',
       passwordHash: driver2PasswordHash,
       status: 'ACTIVE',
     },
     update: {
       status: 'ACTIVE',
-      username: 'mariadriver',
     },
   });
   console.log('✅ Using driver user:', driver2User.email);
 
-  // Create or reuse Admin Memberships (both tenants)
+  // Create Memberships for multi-tenant access
   await prisma.membership.upsert({
     where: {
       userId_tenantId: {
@@ -120,7 +114,7 @@ async function main() {
       role: 'ADMIN',
     },
   });
-  console.log('✅ Ensured Helsinki admin membership');
+  console.log('✅ Created Helsinki admin membership');
 
   await prisma.membership.upsert({
     where: {
@@ -138,7 +132,43 @@ async function main() {
       role: 'ADMIN',
     },
   });
-  console.log('✅ Ensured Tampere admin membership');
+  console.log('✅ Created Tampere admin membership');
+
+  await prisma.membership.upsert({
+    where: {
+      userId_tenantId: {
+        userId: driverUser.id,
+        tenantId: helsinkiTenant.id,
+      },
+    },
+    create: {
+      userId: driverUser.id,
+      tenantId: helsinkiTenant.id,
+      role: 'DRIVER',
+    },
+    update: {
+      role: 'DRIVER',
+    },
+  });
+  console.log('✅ Created driver membership (Helsinki): John');
+
+  await prisma.membership.upsert({
+    where: {
+      userId_tenantId: {
+        userId: driver2User.id,
+        tenantId: helsinkiTenant.id,
+      },
+    },
+    create: {
+      userId: driver2User.id,
+      tenantId: helsinkiTenant.id,
+      role: 'DRIVER',
+    },
+    update: {
+      role: 'DRIVER',
+    },
+  });
+  console.log('✅ Created driver membership (Helsinki): Maria');
 
   // Create or reuse Driver Profile for John (Helsinki)
   const driverProfile = await prisma.driverProfile.upsert({
@@ -192,42 +222,7 @@ async function main() {
     `${driver2Profile.firstName} ${driver2Profile.lastName}`,
   );
 
-  // Create or reuse Driver Memberships (Helsinki)
-  await prisma.membership.upsert({
-    where: {
-      userId_tenantId: {
-        userId: driverUser.id,
-        tenantId: helsinkiTenant.id,
-      },
-    },
-    create: {
-      userId: driverUser.id,
-      tenantId: helsinkiTenant.id,
-      role: 'DRIVER',
-    },
-    update: {
-      role: 'DRIVER',
-    },
-  });
-  console.log('✅ Ensured driver membership (Helsinki): John');
-
-  await prisma.membership.upsert({
-    where: {
-      userId_tenantId: {
-        userId: driver2User.id,
-        tenantId: helsinkiTenant.id,
-      },
-    },
-    create: {
-      userId: driver2User.id,
-      tenantId: helsinkiTenant.id,
-      role: 'DRIVER',
-    },
-    update: {
-      role: 'DRIVER',
-    },
-  });
-  console.log('✅ Ensured driver membership (Helsinki): Maria');
+  // Note: Role and tenant are now part of User model, no separate membership table
 
   // Create or reuse First Pricing Policy (Standard - Helsinki)
   const standardPricing =
@@ -371,6 +366,7 @@ async function main() {
         approvalCode: 'APP123456',
         receiptNumber: '001',
         numberPeriod: '202511', // November 2025
+        createdAt: new Date(),
       },
     });
 

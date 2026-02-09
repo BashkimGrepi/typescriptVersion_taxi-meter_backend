@@ -20,6 +20,8 @@ import { AdminPaymentController } from './controllers/admin-payment.controller';
 import { AdminReportController } from './controllers/admin-report.controller';
 import { AdminProfileController } from './controllers/admin-profile.controller';
 import { AdminRideController } from './controllers/admin-ride.controller';
+import { AdminDashboardController } from './dashboard/controllers/dashboard.controller';
+import { AdminDashboardService } from './dashboard/services/admin-dashboard.service';
 
 @Module({
   imports: [PrismaModule],
@@ -58,6 +60,11 @@ import { AdminRideController } from './controllers/admin-ride.controller';
       useClass: AdminProfileService,
       scope: Scope.REQUEST,
     },
+    {
+      provide: AdminDashboardService,
+      useClass: AdminDashboardService,
+      scope: Scope.REQUEST,
+    },
   ],
   controllers: [
     AdminDriverController,
@@ -66,6 +73,7 @@ import { AdminRideController } from './controllers/admin-ride.controller';
     AdminReportController,
     AdminProfileController,
     AdminRideController,
+    AdminDashboardController,
   ],
   exports: [
     // Export services if needed by other modules
@@ -75,6 +83,7 @@ import { AdminRideController } from './controllers/admin-ride.controller';
     AdminPaymentService,
     AdminReportService,
     AdminProfileService,
+    AdminDashboardService,
   ],
 })
 export class AdminModule {}

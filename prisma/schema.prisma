@@ -7,10 +7,321 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Tenant {
+  id               String             @id @default(uuid())
+  name             String
+  businessId       String
+  settingsJson     Json?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
+  drivers          DriverProfile[]
+  FixedPricePolicy FixedPricePolicy[]
+  invitations      Invitation[]
+  memberships      Membership[]
+  oauthStates      OAuthState[]
+  payments         Payment[]
+  pricing          PricingPolicy[]
+  providerAccts    ProviderAccount[]
+  rides            Ride[]
+  receipts         Receipt[]
+  numberSequences  NumberSequence[]
+  exportArchives   ExportArchive[]
+  vivaAccount      VivaAccount?       @relation("TenantVivaAccount")
+
+  @@index([businessId])
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  passwordHash  String
+  status        UserStatus
+  driverProfile DriverProfile?
+  invitations   Invitation[]
+  memberships   Membership[]
+}
+
+model Membership {
+  id        String   @id @default(uuid())
+  userId    String
+  tenantId  String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId, role])
+  @@index([userId])
+}
+
+model Invitation {
+  id              String         @id @default(uuid())
+  tenantId        String
+  email           String
+  role            Role
+  token           String         @unique
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  invitedByUserId String?
+  driverProfileId String?
+  driverProfile   DriverProfile? @relation(fields: [driverProfileId], references: [id])
+  invitedByUser   User?          @relation(fields: [invitedByUserId], references: [id])
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model DriverProfile {
+  id               String             @id @default(uuid())
+  tenantId         String
+  userId           String             @unique
+  firstName        String
+  lastName         String
+  phone            String?
+  status           String
+  email            String
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  FixedPricePolicy FixedPricePolicy[]
+  invitations      Invitation[]
+  rides            Ride[]
+
+  @@index([tenantId])
+}
+
+model PricingPolicy {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  baseFare  Decimal  @db.Decimal(10, 2)
+  perKm     Decimal  @db.Decimal(10, 4)
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  perMin    Decimal  @default(0.000) @db.Decimal(10, 3)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ride      Ride[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, updatedAt])
+}
+
+model FixedPricePolicy {
+  id              String         @id @default(uuid())
+  tenantId        String
+  driverProfileId String?
+  name            String
+  amount          Decimal        @db.Decimal(10, 2)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  createdByUserId String?
+  driverProfile   DriverProfile? @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rides           Ride[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, driverProfileId])
+}
+
+model Ride {
+  id                 String            @id @default(uuid())
+  status             RideStatus
+  distanceKm         Decimal?          @db.Decimal(10, 3)
+  driverProfileId    String
+  durationMin        Decimal?          @db.Decimal(10, 2)
+  endedAt            DateTime?
+  fareSubtotal       Decimal?          @db.Decimal(10, 2)
+  fareTotal          Decimal?          @db.Decimal(10, 2)
+  pricingPolicyId    String?
+  startedAt          DateTime
+  taxAmount          Decimal?          @db.Decimal(10, 2)
+  tenantId           String
+  customFixedFare    Decimal?          @db.Decimal(10, 2)
+  fixedPricePolicyId String?
+  pricingMode        RidePricingMode   @default(METER)
+  payment            Payment?
+  links              PaymentLink[]
+  receipts           Receipt?
+  driverProfile      DriverProfile     @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  fixed              FixedPricePolicy? @relation(fields: [fixedPricePolicyId], references: [id])
+  pricing            PricingPolicy?    @relation(fields: [pricingPolicyId], references: [id])
+  tenant             Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  webhookEvents      WebhookEvent[]
+
+  @@index([tenantId, status])
+  @@index([driverProfileId])
+  @@index([startedAt])
+  @@index([tenantId, endedAt])
+}
+
+model Payment {
+  id                String          @id @default(uuid())
+  rideId            String          @unique
+  tenantId          String
+  provider          PaymentProvider
+  amount            Decimal         @db.Decimal(10, 2)
+  taxAmount         Decimal?        @db.Decimal(10, 2)
+  netAmount         Decimal?        @db.Decimal(10, 2)
+  currency          String          @default("EUR")
+  status            PaymentStatus
+  createdAt         DateTime        @default(now())
+  authorizedAt      DateTime?
+  capturedAt        DateTime?
+  failureCode       String?
+  externalPaymentId String?
+  invoiceNumber     String?
+  numberPeriod      String?
+  receiptNumber     String?
+  approvalCode      String?
+  providerMetadata  Json?
+  ride              Ride            @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  receipts          Receipt[]
+  webhookEvents     WebhookEvent[]
+
+  @@unique([tenantId, numberPeriod, receiptNumber])
+  @@unique([tenantId, numberPeriod, invoiceNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, capturedAt])
+  @@index([tenantId, status, capturedAt])
+  @@index([externalPaymentId])
+}
+
+model Receipt {
+  id        String    @id @default(uuid())
+  tenantId  String
+  rideId    String    @unique
+  paymentId String
+  publicId  String    @unique
+  status    String
+  issuedAt  DateTime
+  expiresAt DateTime?
+  pdfUrl    String?
+  dataJson  Json
+  payment   Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  ride      Ride      @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model NumberSequence {
+  id        String             @id @default(uuid())
+  tenantId  String
+  type      NumberSequenceType
+  period    String
+  current   Int
+  createdAt DateTime           @default(now())
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, type, period])
+}
+
+model ExportArchive {
+  id              String            @id @default(uuid())
+  tenantId        String
+  period          String
+  type            ExportArchiveType
+  createdAt       DateTime          @default(now())
+  createdByUserId String
+  pdfPath         String
+  jsonPath        String
+  sha256          String
+  count           Int
+  totalAmount     Decimal           @db.Decimal(10, 2)
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, period, type])
+}
+
+model PaymentLink {
+  id        String          @id @default(uuid())
+  rideId    String
+  provider  PaymentProvider
+  url       String
+  status    String
+  createdAt DateTime        @default(now())
+  expiresAt DateTime?
+  ride      Ride            @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@index([rideId, status])
+}
+
+model ProviderAccount {
+  id                String          @id @default(uuid())
+  tenantId          String
+  provider          PaymentProvider
+  externalAccountId String
+  accessTokenEnc    String?
+  refreshTokenEnc   String?
+  scope             String?
+  livemode          Boolean         @default(false)
+  connectedAt       DateTime?
+  metadataJson      Json?
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider])
+}
+
+model VivaAccount {
+  id          String   @id @default(uuid())
+  tenantId    String   @unique
+  provider    PaymentProvider
+  merchantId  String
+  liveMode    Boolean  @default(false)
+  connectedAt DateTime
+
+  tenant Tenant @relation("TenantVivaAccount", fields: [tenantId], references: [id])
+
+  @@index([tenantId, merchantId])
+}
+
+model WebhookEvent {
+  id           String          @id @default(uuid())
+  provider     PaymentProvider
+  eventType    String
+  externalId   String          @unique
+  receivedAt   DateTime        @default(now())
+  payloadJson  Json
+  processedAt  DateTime?
+  attemptCount Int             @default(0)
+  paymentId    String?
+  rideId       String?
+  errorMessage String?
+  payment      Payment?        @relation(fields: [paymentId], references: [id])
+  ride         Ride?           @relation(fields: [rideId], references: [id])
+
+  @@index([provider, eventType])
+  @@index([paymentId])
+  @@index([rideId])
+  @@index([receivedAt])
+}
+
+model OAuthState {
+  id        String          @id @default(uuid())
+  nonce     String          @unique
+  tenantId  String
+  userId    String
+  provider  PaymentProvider
+  createdAt DateTime        @default(now())
+  expiresAt DateTime
+  consumed  Boolean         @default(false)
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([nonce])
+  @@index([expiresAt])
+  @@index([tenantId, provider])
+}
+
 enum Role {
   ADMIN
-  MANAGER
   DRIVER
+  MANAGER
 }
 
 enum RideStatus {
@@ -61,306 +372,7 @@ enum RidePricingMode {
   CUSTOM_FIXED
 }
 
-model Tenant {
-  id               String             @id @default(uuid())
-  name             String
-  businessId       String // yTunnus
-  settingsJson     Json?
-  memberships      Membership[]
-  drivers          DriverProfile[]
-  pricing          PricingPolicy[]
-  rides            Ride[]
-  providerAccts    ProviderAccount[]
-  invitations      Invitation[]
-  payments         Payment[]
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  deletedAt        DateTime?
-  oauthStates      OAuthState[]
-  FixedPricePolicy FixedPricePolicy[]
-
-  @@index([businessId])
-}
-
-model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  username      String?
-  passwordHash  String
-  status        String // ACTIVE, LOCKED, etc.
-  memberships   Membership[]
-  driverProfile DriverProfile?
-  invitations   Invitation[] // invitations sent by this user
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-}
-
-model Membership {
-  id        String   @id @default(uuid())
-  userId    String
-  tenantId  String
-  role      Role
-  invitedBy String?
-  createdAt DateTime @default(now())
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, tenantId])
-  @@index([tenantId, role])
-}
-
-model Invitation {
-  id              String    @id @default(uuid())
-  tenantId        String
-  email           String
-  role            Role
-  token           String    @unique
-  expiresAt       DateTime
-  acceptedAt      DateTime?
-  invitedByUserId String?
-  driverProfileId String?
-
-  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  invitedByUser User?          @relation(fields: [invitedByUserId], references: [id], onDelete: SetNull)
-  driverProfile DriverProfile? @relation(fields: [driverProfileId], references: [id], onDelete: SetNull)
-}
-
-model DriverProfile {
-  id          String       @id @default(uuid())
-  tenantId    String
-  userId      String?      @unique // null until invitation accepted
-  firstName   String
-  lastName    String
-  email       String
-  phone       String?
-  status      String // INVITED, ACTIVE, INACTIVE
-  rides       Ride[]
-  invitations Invitation[] // invitations for this driver profile
-
-  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
-  FixedPricePolicy FixedPricePolicy[]
-
-  @@index([tenantId])
-  @@index([userId])
-}
-
-model PricingPolicy {
-  id        String   @id @default(uuid())
-  tenantId  String
-  name      String
-  baseFare  Decimal  @db.Decimal(10, 2)
-  perKm     Decimal  @db.Decimal(10, 4)
-  perMin    Decimal  @default(0.000) @db.Decimal(10, 3)
-  isActive  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-  ride      Ride[]
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  // note: 'single active policy per tenant' is enforced via postgresql
-  // partial unique index added in sql migration
-
-  @@index([tenantId, isActive])
-  @@index([tenantId, updatedAt])
-}
-
-model FixedPricePolicy {
-  id              String  @id @default(uuid())
-  tenantId        String
-  driverProfileId String? // null = tenant-wide tariff; not null = personal
-  name            String // e.g. "Airport flat rate"
-  amount          Decimal @db.Decimal(10, 2) // total price incl. VAT
-
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  createdByUserId String?
-
-  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  driverProfile DriverProfile? @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
-
-  rides Ride[]
-
-  @@index([tenantId, isActive])
-  @@index([tenantId, driverProfileId])
-}
-
-model Ride {
-  id                 String          @id @default(uuid())
-  tenantId           String // Every ride must belong to a tenant
-  driverProfileId    String
-  pricingPolicyId    String?
-  startedAt          DateTime
-  endedAt            DateTime?
-  durationMin        Decimal?        @db.Decimal(10, 2)
-  distanceKm         Decimal?        @db.Decimal(10, 3)
-  fareSubtotal       Decimal?        @db.Decimal(10, 2)
-  taxAmount          Decimal?        @db.Decimal(10, 2)
-  fareTotal          Decimal?        @db.Decimal(10, 2)
-  status             RideStatus
-  pricingMode        RidePricingMode @default(METER)
-  fixedPricePolicyId String? // for FIXED_POLICY
-  customFixedFare    Decimal?        @db.Decimal(10, 2) // for  CUSTOM_FIXED
-
-  payment       Payment?
-  receipts      Receipt[]
-  links         PaymentLink[]
-  webhookEvents WebhookEvent[]
-
-  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  driverProfile DriverProfile     @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
-  pricing       PricingPolicy?    @relation(fields: [pricingPolicyId], references: [id], onDelete: SetNull)
-  fixed         FixedPricePolicy? @relation(fields: [fixedPricePolicyId], references: [id], onDelete: SetNull)
-
-  @@index([tenantId, status])
-  @@index([driverProfileId])
-  @@index([startedAt])
-  @@index([tenantId, endedAt])
-}
-
-model Payment {
-  id                String          @id @default(uuid())
-  rideId            String          @unique
-  tenantId          String
-  provider          PaymentProvider
-  amount            Decimal         @db.Decimal(10, 2)
-  currency          String          @default("EUR")
-  status            PaymentStatus
-  authorizedAt      DateTime?
-  capturedAt        DateTime? // when termianl returns (sales response / callback)
-  failureCode       String?
-  externalPaymentId String? // e.g. pi_xxx or Viva transaction id, platform-observed stripe object ID
-  approvalCode      String?
-  receiptNumber     String? // for the simplified monthly payment pdf receipt
-  invoiceNumber     String?
-  numberPeriod      String? // '202508' -> null until assigned
-
-  ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  receipts      Receipt[]
-  webhookEvents WebhookEvent[]
-
-  @@unique([tenantId, numberPeriod, receiptNumber])
-  @@unique([tenantId, numberPeriod, invoiceNumber])
-  @@index([tenantId, status])
-  @@index([tenantId, capturedAt])
-  @@index([tenantId, status, capturedAt])
-  @@index([externalPaymentId])
-}
-
-model Receipt {
-  id        String    @id @default(uuid())
-  tenantId  String
-  rideId    String    @unique
-  paymentId String
-  publicId  String    @unique
-  status    String //DRAFT|ISSUED|VOID  
-  issuedAt  DateTime
-  expiresAt DateTime?
-  pdfUrl    String?
-  dataJson  Json
-
-  ride    Ride    @relation(fields: [rideId], references: [id], onDelete: Cascade)
-  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-}
-
-model NumberSequence {
-  id        String             @id @default(uuid())
-  tenantId  String
-  type      NumberSequenceType
-  period    String // 'YYYYMM'
-  current   Int
-  createdAt DateTime           @default(now())
-
-  @@unique([tenantId, type, period])
-}
-
-model ExportArchive {
-  id              String            @id @default(uuid())
-  tenantId        String
-  period          String
-  type            ExportArchiveType
-  createdAt       DateTime          @default(now())
-  createdByUserId String
-  pdfPath         String
-  jsonPath        String
-  sha256          String
-  count           Int
-  totalAmount     Decimal           @db.Decimal(10, 2)
-
-  @@index([tenantId, period, type])
-}
-
-model PaymentLink {
-  id        String          @id @default(uuid())
-  rideId    String
-  provider  PaymentProvider
-  url       String
-  status    String // ACTIVE|EXPIRED|CONSUMED
-  createdAt DateTime        @default(now())
-  expiresAt DateTime?
-
-  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
-
-  @@index([rideId, status])
-}
-
-model ProviderAccount {
-  id                String          @id @default(uuid())
-  tenantId          String
-  provider          PaymentProvider
-  externalAccountId String // Stripe acct_... or Viva merchant id
-  accessTokenEnc    String?
-  refreshTokenEnc   String?
-  scope             String?
-  livemode          Boolean         @default(false)
-  connectedAt       DateTime?
-  metadataJson      Json?
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantId, provider])
-}
-
-model WebhookEvent {
-  id           String          @id @default(uuid())
-  provider     PaymentProvider
-  eventType    String
-  externalId   String          @unique //viva transaction id
-  receivedAt   DateTime        @default(now())
-  payloadJson  Json
-  processedAt  DateTime?
-  attemptCount Int             @default(0)
-  paymentId    String?
-  rideId       String?
-  errorMessage String?
-
-  ride    Ride?    @relation(fields: [rideId], references: [id], onDelete: SetNull)
-  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-
-  @@index([provider, eventType])
-  @@index([paymentId])
-  @@index([rideId])
-  @@index([receivedAt])
-}
-
-model OAuthState {
-  id        String          @id @default(uuid())
-  nonce     String          @unique
-  tenantId  String
-  userId    String
-  provider  PaymentProvider // STRIPE or VIVA
-  createdAt DateTime        @default(now())
-  expiresAt DateTime
-  consumed  Boolean         @default(false) // Prevents replay attacks
-
-  // Optional: Foreign key relations for data integrity
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  // Note: Can't relate to User directly since User.id is String but we might store different ID format
-
-  @@index([nonce])
-  @@index([expiresAt])
-  @@index([tenantId, provider])
+enum UserStatus {
+  ACTIVE
+  OFFLINE
 }

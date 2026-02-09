@@ -202,3 +202,4 @@ export class PaymentsPageResponse {
   @ApiProperty({ description: 'Total pages', example: 6 })
   totalPages: number;
 }
+

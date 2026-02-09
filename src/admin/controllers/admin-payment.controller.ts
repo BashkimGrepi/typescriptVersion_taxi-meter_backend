@@ -11,7 +11,8 @@ import {
   UseGuards,
   ValidationPipe,
   HttpCode,
-  HttpStatus
+  HttpStatus,
+  Req
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { UniversalV1Guard } from '../../auth/guards/universal-v1.guard';
@@ -36,24 +37,30 @@ export class AdminPaymentController {
 
   @Get()
   async getPayments(
+    @Request() req,
     @Query(new ValidationPipe({ transform: true })) query: PaymentsQueryDto,
   ): Promise<PaymentsPageResponse> {
-    return this.adminPaymentService.getPayments(query);
+    const tenantId = req.user.tenantId;
+    return this.adminPaymentService.getPayments(tenantId, query);
   }
 
   @Get('summary')
   async getPaymentsSummary(
+    @Request() req,
     @Query('from') from?: string,
     @Query('to') to?: string
   ) {
-    return this.adminPaymentService.getPaymentsSummary(from, to);
+    const tenantId = req.user.tenantId;
+    return this.adminPaymentService.getPaymentsSummary(tenantId, from, to);
   }
 
   @Get(':id')
   async getPaymentById(
+    @Request() req,
     @Param('id') paymentId: string,
   ): Promise<PaymentResponseDto> {
-    return this.adminPaymentService.getPaymentById(paymentId);
+    const tenantId = req.user.tenantId;
+    return this.adminPaymentService.getPaymentById(tenantId, paymentId);
   }
 
   @Post()
@@ -61,7 +68,8 @@ export class AdminPaymentController {
     @Body() createPaymentDto: CreatePaymentDto,
     @Request() req
   ): Promise<PaymentResponseDto> {
-    return this.adminPaymentService.createPayment(createPaymentDto);
+    const tenantId = req.user.tenantId;
+    return this.adminPaymentService.createPayment(tenantId, createPaymentDto);
   }
 
   @Patch(':id')
@@ -70,14 +78,17 @@ export class AdminPaymentController {
     @Body() updatePaymentDto: UpdatePaymentDto,
     @Request() req
   ): Promise<PaymentResponseDto> {
-    return this.adminPaymentService.updatePayment(paymentId, updatePaymentDto);
+    const tenantId = req.user.tenantId;
+    return this.adminPaymentService.updatePayment(tenantId, paymentId, updatePaymentDto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deletePayment(
+    @Request() req,
     @Param('id') paymentId: string,
   ): Promise<void> {
-    await this.adminPaymentService.deletePayment(paymentId);
+    const tenantId = req.user.tenantId;
+    await this.adminPaymentService.deletePayment(tenantId, paymentId);
   }
 }

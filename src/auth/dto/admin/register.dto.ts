@@ -4,7 +4,7 @@ import { Type } from 'class-transformer';
 class TenantDto {
   @IsNotEmpty()
   name: string;
-  
+
   @IsNotEmpty()
   businessId: string;
 }
@@ -15,9 +15,6 @@ export class RegisterDto {
   @IsNotEmpty()
   @IsString()
   password: string;
-
-  @IsString()
-  username?: string;
 
   @ValidateNested()
   @Type(() => TenantDto)

@@ -14,7 +14,7 @@ import {
 import { DriverRideService } from '../services/driver-ride.service';
 import { UniversalV1Guard } from 'src/auth/guards/universal-v1.guard';
 import { StartRideDto } from '../dto/StartRideDto';
-import { StartRideResponseDtoNew } from '../dto/StartRideResponseDto';
+import { StartRideResponseDto } from '../dto/StartRideResponseDto';
 import { EndRideDto, EndRideResponseDto } from '../dto/EndRideDto';
 import * as RideHistoryDto from '../dto/RideHistoryDto';
 
@@ -28,12 +28,16 @@ export class DriverRideController {
   async startRide(
     @Body() dto: StartRideDto,
     @Req() req,
-): Promise<StartRideResponseDtoNew> {
+  ): Promise<StartRideResponseDto> {
     if (req.user.role !== 'DRIVER') {
       throw new ForbiddenException('Only drivers can start rides');
     }
 
-    return this.rideService.startRide({ dto });
+    return this.rideService.startRide({
+      dto,
+      userId: req.user.userId,
+      tenantId: req.user.tenantId,
+    });
   }
 
   @Post('end')
@@ -45,12 +49,19 @@ export class DriverRideController {
       throw new ForbiddenException('Only drivers can end rides');
     }
 
-    return this.rideService.endRide({ dto });
+    return this.rideService.endRide({
+      dto,
+      userId: req.user.userId,
+      tenantId: req.user.tenantId,
+    });
   }
 
   @Get('today-summary')
   async getTodaysSummary(@Request() req: any) {
-    return this.rideService.getTodaysSummary();
+    const userId = req.user.userId;
+    const tenantId = req.user.tenantId;
+    
+    return this.rideService.getTodaysSummary({ userId, tenantId });
   }
 
   @Get('history')
@@ -58,17 +69,23 @@ export class DriverRideController {
     @Request() req: any,
     @Query() query: RideHistoryDto.RideHistoryRequestDto,
   ) {
+    const userId = req.user.userId;
+    const tenantId = req.user.tenantId;
     return this.rideService.getRideHistory({
       dto: {
         timeFilter: query.timeFilter || 'week',
         page: query.page ? parseInt(query.page.toString()) : 1,
         limit: query.limit ? parseInt(query.limit.toString()) : 20,
       },
+      userId,
+      tenantId,
     });
   }
 
   @Get(':rideId/details')
   async getRideDetails(@Request() req: any, @Param('rideId') rideId: string) {
-    return this.rideService.getRideDetails({rideId});
+    const userId = req.user.userId;
+    const tenantId = req.user.tenantId;
+    return this.rideService.getRideDetails({ rideId, userId, tenantId });
   }
 }

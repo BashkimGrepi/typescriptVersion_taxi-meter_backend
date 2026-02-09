@@ -1,25 +1,32 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Patch, 
-  Param, 
-  Body, 
-  Query, 
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
   Request,
   UseGuards,
-  ValidationPipe
+  ValidationPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { UniversalV1Guard } from '../../auth/guards/universal-v1.guard';
 import { AdminRoles } from '../decorators/admin-role.decorator';
 import { AdminDriverService } from '../services/admin-driver.service';
-import { 
-  CreateDriverDto, 
-  UpdateDriverDto, 
-  DriversQueryDto, 
+import {
+  CreateDriverDto,
+  UpdateDriverDto,
+  DriversQueryDto,
   DriverResponseDto,
-  DriversPageResponse 
+  DriversPageResponse,
 } from '../dto/driver-admin.dto';
 
 @ApiTags('admin-drivers')
@@ -32,25 +39,31 @@ export class AdminDriverController {
 
   @Get()
   async getDrivers(
+    @Request() req,
     @Query(new ValidationPipe({ transform: true })) query: DriversQueryDto,
   ): Promise<DriversPageResponse> {
-    return this.adminDriverService.getDrivers(query);
+    const tenantId = req.user.tenantId;
+    return this.adminDriverService.getDrivers(tenantId, query);
   }
 
-  @Post("create")
+  @Post('create')
   async createDriver(
-    @Body(new ValidationPipe({ transform: true, whitelist: true })) 
+    @Request() req,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
     createDriverDto: CreateDriverDto,
   ): Promise<DriverResponseDto> {
-    return this.adminDriverService.createDriver(createDriverDto);
+    const tenantId = req.user.tenantId;
+    return this.adminDriverService.createDriver(tenantId, createDriverDto);
   }
 
   @Patch(':id')
   async updateDriver(
+    @Request() req,
     @Param('id') driverId: string,
-    @Body(new ValidationPipe({ transform: true, whitelist: true })) 
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
     updateDriverDto: UpdateDriverDto,
   ): Promise<DriverResponseDto> {
-    return this.adminDriverService.updateDriver(driverId, updateDriverDto);
+    const tenantId = req.user.tenantId;
+    return this.adminDriverService.updateDriver(tenantId, driverId, updateDriverDto);
   }
 }

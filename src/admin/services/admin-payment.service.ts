@@ -5,7 +5,7 @@ import {
   UpdatePaymentDto, 
   PaymentsQueryDto, 
   PaymentResponseDto, 
-  PaymentsPageResponse 
+  PaymentsPageResponse, 
 } from '../dto/payment-admin.dto';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PaymentProvider, PaymentStatus } from '@prisma/client';
@@ -267,7 +267,7 @@ export class AdminPaymentService {
     });
   }
 
-  async getPaymentsSummary(tenantId: string, from?: string, to?: string) {
+  async getPaymentsSummary(tenantId: string, from?: string, to?: string): Promise<any> {
     const where: any = { tenantId };
 
     // Date range filter based on ride relationship

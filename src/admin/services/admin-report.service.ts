@@ -1,13 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { 
+import {
   ReportsQueryDto,
-  RevenueReportResponse, 
+  RevenueReportResponse,
   RevenueReportItem,
   DriverPerformanceResponse,
   DriverPerformanceItem,
   PaymentMethodReportResponse,
-  PaymentMethodReportItem
+  PaymentMethodReportItem,
 } from '../dto/report-admin.dto';
 import { Decimal } from '@prisma/client/runtime/library';
 import { RideStatus } from '@prisma/client';
@@ -25,9 +25,9 @@ export class AdminReportService extends TenantScopedService {
   }
 
   async getRevenueReport(
+    tenantId: string,
     query: ReportsQueryDto,
   ): Promise<RevenueReportResponse> {
-    const tenantId = this.getCurrentTenantId();
     const { from, to, driverId, granularity = 'daily' } = query;
 
     // Build date range
@@ -104,9 +104,9 @@ export class AdminReportService extends TenantScopedService {
   }
 
   async getDriverPerformanceReport(
+    tenantId: string,
     query: ReportsQueryDto,
   ): Promise<DriverPerformanceResponse> {
-    const tenantId = this.getCurrentTenantId();
     const { from, to } = query;
 
     // Build date range
@@ -214,9 +214,9 @@ export class AdminReportService extends TenantScopedService {
   }
 
   async getPaymentMethodReport(
+    tenantId: string,
     query: ReportsQueryDto,
   ): Promise<PaymentMethodReportResponse> {
-    const tenantId = this.getCurrentTenantId();
     const { from, to } = query;
 
     // Build date range - using ride relationship since Payment doesn't have createdAt
@@ -367,5 +367,162 @@ export class AdminReportService extends TenantScopedService {
     // Sort by period
     items.sort((a, b) => a.period.localeCompare(b.period));
     return items;
+  }
+
+  async getDashboardSummary(
+    tenantId: string,
+    query: ReportsQueryDto,
+  ): Promise<any> {
+    const { from, to } = query;
+
+    // Get tenant creation date for default 'from' date
+    let fromDate: Date;
+    if (from) {
+      fromDate = new Date(from);
+    } else {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { createdAt: true },
+      });
+      fromDate = tenant?.createdAt || new Date(0);
+    }
+
+    const toDate = to ? new Date(to) : new Date();
+
+    // Fetch all data in parallel
+    const [
+      totalRides,
+      completedRides,
+      cancelledRides,
+      ongoingRides,
+      allDrivers,
+      activeDriversData,
+      revenueData,
+      cardPayments,
+      cashPayments,
+      failedPayments,
+    ] = await Promise.all([
+      // 1. Total rides (all statuses)
+      this.prisma.ride.count({
+        where: { tenantId, startedAt: { gte: fromDate, lte: toDate } },
+      }),
+
+      // 2. Completed rides
+      this.prisma.ride.count({
+        where: {
+          tenantId,
+          status: RideStatus.COMPLETED,
+          startedAt: { gte: fromDate, lte: toDate },
+        },
+      }),
+
+      // 3. Cancelled rides
+      this.prisma.ride.count({
+        where: {
+          tenantId,
+          status: RideStatus.CANCELLED,
+          startedAt: { gte: fromDate, lte: toDate },
+        },
+      }),
+
+      // 4. Ongoing rides
+      this.prisma.ride.count({
+        where: {
+          tenantId,
+          status: RideStatus.ONGOING,
+          startedAt: { gte: fromDate, lte: toDate },
+        },
+      }),
+
+      // 5. All drivers count
+      this.prisma.driverProfile.count({
+        where: { tenantId },
+      }),
+
+      // 6. Active drivers (who had completed rides in period)
+      this.prisma.ride.findMany({
+        where: {
+          tenantId,
+          status: RideStatus.COMPLETED,
+          startedAt: { gte: fromDate, lte: toDate },
+        },
+        select: { driverProfileId: true },
+        distinct: ['driverProfileId'],
+      }),
+
+      // 7. Revenue data
+      this.prisma.ride.aggregate({
+        where: {
+          tenantId,
+          status: RideStatus.COMPLETED,
+          startedAt: { gte: fromDate, lte: toDate },
+        },
+        _sum: {
+          fareSubtotal: true,
+          taxAmount: true,
+          fareTotal: true,
+        },
+      }),
+
+      // 8. Card/Viva payments
+      this.prisma.payment.aggregate({
+        where: {
+          tenantId,
+          provider: 'VIVA',
+          status: { in: ['PAID'] },
+          ride: { startedAt: { gte: fromDate, lte: toDate } },
+        },
+        _sum: { amount: true },
+      }),
+
+      // 9. Cash payments
+      this.prisma.payment.aggregate({
+        where: {
+          tenantId,
+          provider: 'CASH',
+          status: 'PAID',
+          ride: { startedAt: { gte: fromDate, lte: toDate } },
+        },
+        _sum: { amount: true },
+      }),
+
+      // 10. Failed payments
+      this.prisma.payment.aggregate({
+        where: {
+          tenantId,
+          status: 'FAILED',
+          ride: { startedAt: { gte: fromDate, lte: toDate } },
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    // Helper function to format Decimal to string with 2 decimals
+    const formatMoney = (d: Decimal | null | undefined): string => {
+      if (!d) return '0.00';
+      return d.toFixed(2);
+    };
+
+    return {
+      period: `${fromDate.toISOString().split('T')[0]} to ${toDate.toISOString().split('T')[0]}`,
+      rides: {
+        total: totalRides,
+        completed: completedRides,
+        cancelled: cancelledRides,
+        ongoing: ongoingRides,
+        allDrivers: allDrivers,
+        activeDrivers: activeDriversData.length,
+      },
+      revenue: {
+        subtotal: formatMoney(revenueData._sum.fareSubtotal),
+        tax: formatMoney(revenueData._sum.taxAmount),
+        total: formatMoney(revenueData._sum.fareTotal),
+      },
+      paymentDistribution: {
+        card: formatMoney(cardPayments._sum.amount),
+        cash: formatMoney(cashPayments._sum.amount),
+        failed: formatMoney(failedPayments._sum.amount),
+      },
+    };
   }
 }

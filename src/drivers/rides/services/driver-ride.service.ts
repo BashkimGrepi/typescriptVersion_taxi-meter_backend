@@ -411,6 +411,8 @@ export class DriverRideService {
       },
       update: {
         amount: updated.fareTotal!,
+        netAmount: updated.fareSubtotal!,
+        taxAmount: updated.taxAmount!,
         status: PaymentStatus.PENDING,
         authorizedAt: new Date(),
         failureCode: null,
@@ -421,8 +423,11 @@ export class DriverRideService {
         tenantId: updated.tenantId,
         provider: PaymentProvider.VIVA, // add later to schema viva_terminal
         amount: updated.fareTotal!,
+        netAmount: updated.fareSubtotal!,
+        taxAmount: updated.taxAmount!,
         currency: 'EUR',
         status: PaymentStatus.PENDING,
+        createdAt: new Date(),
         authorizedAt: null,
         capturedAt: null,
         failureCode: null,

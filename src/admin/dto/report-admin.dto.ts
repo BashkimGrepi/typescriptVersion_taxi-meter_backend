@@ -6,16 +6,16 @@ export class ReportsQueryDto {
   @ApiProperty({
     description: 'Start date filter (ISO string)',
     example: '2024-01-01T00:00:00.000Z',
-    required: false
+    required: false,
   })
   @IsOptional()
   @IsString()
   from?: string;
 
   @ApiProperty({
-    description: 'End date filter (ISO string)', 
+    description: 'End date filter (ISO string)',
     example: '2024-12-31T23:59:59.999Z',
-    required: false
+    required: false,
   })
   @IsOptional()
   @IsString()
@@ -24,7 +24,7 @@ export class ReportsQueryDto {
   @ApiProperty({
     description: 'Filter by driver profile ID',
     example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-    required: false
+    required: false,
   })
   @IsOptional()
   @IsUUID(4, { message: 'Driver ID must be a valid UUID' })
@@ -35,11 +35,11 @@ export class ReportsQueryDto {
     example: 'daily',
     enum: ['daily', 'weekly', 'monthly'],
     required: false,
-    default: 'daily'
+    default: 'daily',
   })
   @IsOptional()
   @IsIn(['daily', 'weekly', 'monthly'], {
-    message: 'Granularity must be one of: daily, weekly, monthly'
+    message: 'Granularity must be one of: daily, weekly, monthly',
   })
   granularity?: string = 'daily';
 }
@@ -57,7 +57,10 @@ export class RevenueReportItem {
   @ApiProperty({ description: 'Average fare per ride', example: '27.79' })
   avgFarePerRide: string;
 
-  @ApiProperty({ description: 'Total distance in kilometers', example: '423.5' })
+  @ApiProperty({
+    description: 'Total distance in kilometers',
+    example: '423.5',
+  })
   totalDistanceKm: string;
 
   @ApiProperty({ description: 'Total duration in minutes', example: '720.25' })
@@ -70,7 +73,7 @@ export class RevenueReportResponse {
 
   @ApiProperty({
     description: 'Revenue data by time period',
-    type: [RevenueReportItem]
+    type: [RevenueReportItem],
   })
   data: RevenueReportItem[];
 
@@ -83,8 +86,8 @@ export class RevenueReportResponse {
       avgRevenuePerDay: { type: 'string', example: '416.86' },
       avgFarePerRide: { type: 'string', example: '27.79' },
       totalDistanceKm: { type: 'string', example: '4235.8' },
-      totalDurationHours: { type: 'string', example: '120.04' }
-    }
+      totalDurationHours: { type: 'string', example: '120.04' },
+    },
   })
   summary: {
     totalRides: number;
@@ -97,7 +100,10 @@ export class RevenueReportResponse {
 }
 
 export class DriverPerformanceItem {
-  @ApiProperty({ description: 'Driver profile ID', example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' })
+  @ApiProperty({
+    description: 'Driver profile ID',
+    example: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+  })
   driverProfileId: string;
 
   @ApiProperty({ description: 'Driver first name', example: 'John' })
@@ -131,7 +137,7 @@ export class DriverPerformanceResponse {
 
   @ApiProperty({
     description: 'Driver performance data',
-    type: [DriverPerformanceItem]
+    type: [DriverPerformanceItem],
   })
   drivers: DriverPerformanceItem[];
 
@@ -144,8 +150,8 @@ export class DriverPerformanceResponse {
       totalRides: { type: 'number', example: 540 },
       totalRevenue: { type: 'string', example: '15006.25' },
       avgRidesPerDriver: { type: 'string', example: '45.0' },
-      avgRevenuePerDriver: { type: 'string', example: '1250.52' }
-    }
+      avgRevenuePerDriver: { type: 'string', example: '1250.52' },
+    },
   })
   fleetSummary: {
     totalDrivers: number;
@@ -177,7 +183,7 @@ export class PaymentMethodReportResponse {
 
   @ApiProperty({
     description: 'Payment method breakdown',
-    type: [PaymentMethodReportItem]
+    type: [PaymentMethodReportItem],
   })
   paymentMethods: PaymentMethodReportItem[];
 
@@ -188,8 +194,8 @@ export class PaymentMethodReportResponse {
       totalPayments: { type: 'number', example: 190 },
       totalAmount: { type: 'string', example: '5267.25' },
       avgPaymentAmount: { type: 'string', example: '27.72' },
-      paymentRate: { type: 'string', example: '95.5' }
-    }
+      paymentRate: { type: 'string', example: '95.5' },
+    },
   })
   summary: {
     totalPayments: number;
@@ -197,4 +203,98 @@ export class PaymentMethodReportResponse {
     avgPaymentAmount: string;
     paymentRate: string; // percentage of rides with payments
   };
+}
+
+export class PaymentAnalyticsResponse {
+  period: string; // "2025-01-01 to 2025-01-31"
+
+  // ═══════════════════════════════════════════════════════
+  // 1. OVERALL SUMMARY
+  // ═══════════════════════════════════════════════════════
+  summary: {
+    totalPayments: number; // COUNT(*)
+    totalAmount: string; // SUM(amount)
+    avgAmount: string; // AVG(amount)
+    successfulPayments: number; // COUNT where status = 'PAID'
+    failedPayments: number; // COUNT where status = 'FAILED'
+    pendingPayments: number; // COUNT where status in ['PENDING', 'REQUIRES_ACTION', 'SUBMITTED']
+    refundedPayments: number; // COUNT where status = 'REFUNDED'
+    successRate: number; // (successful / total) * 100
+    failureRate: number; // (failed / total) * 100
+    avgProcessingTime: string; // AVG(capturedAt - authorizedAt) in seconds
+  };
+
+  // ═══════════════════════════════════════════════════════
+  // 2. BY STATUS - All 6 statuses
+  // ═══════════════════════════════════════════════════════
+  byStatus: Array<{
+    status: string; // PAID, FAILED, PENDING, etc.
+    count: number; // COUNT(*) GROUP BY status
+    amount: string; // SUM(amount) GROUP BY status
+    percentage: number; // (count / total) * 100
+  }>;
+
+  // ═══════════════════════════════════════════════════════
+  // 3. BY PROVIDER - CASH vs VIVA
+  // ═══════════════════════════════════════════════════════
+  byProvider: Array<{
+    provider: string; // CASH | VIVA
+    totalCount: number; // COUNT(*) GROUP BY provider
+    totalAmount: string; // SUM(amount) GROUP BY provider
+    avgAmount: string; // AVG(amount) GROUP BY provider
+
+    // Status breakdown per provider
+    paidCount: number; // COUNT where status='PAID'
+    failedCount: number; // COUNT where status='FAILED'
+    pendingCount: number; // COUNT where status in pending states
+    refundedCount?: number; // COUNT where status='REFUNDED'
+
+    successRate: number; // (paid / total) * 100
+    failureRate: number; // (failed / total) * 100
+
+    // Only for VIVA (CASH doesn't have these)
+    avgProcessingTime?: string; // AVG(capturedAt - authorizedAt)
+    withExternalId: number; // COUNT where externalPaymentId IS NOT NULL
+  }>;
+
+  // ═══════════════════════════════════════════════════════
+  // 4. FAILURE ANALYSIS - Only for failed payments
+  // ═══════════════════════════════════════════════════════
+ // failures: {
+   // totalFailures: number; // COUNT where status='FAILED'
+   // totalFailedAmount: string; // SUM(amount) where status='FAILED'
+
+   // byCode: Array<{
+   //   // GROUP BY failureCode
+   //   code: string; // failureCode value
+   //   count: number; // COUNT(*)
+   //   amount: string; // SUM(amount)
+   //   percentage: number; // (count / totalFailures) * 100
+  //  }>;
+
+  //  byProvider: Array<{
+  //    // Failures per provider
+  //    provider: string; // CASH | VIVA
+  //    failureCount: number; // COUNT where status='FAILED'
+  //    failureRate: number; // (failures / provider_total) * 100
+  //  }>;
+  //};
+
+  // ═══════════════════════════════════════════════════════
+  // 5. REFUNDS - Track refunded payments
+  // ═══════════════════════════════════════════════════════
+  //refunds: {
+    //totalRefunds: number; // COUNT where status='REFUNDED'
+    //totalRefundedAmount: string; // SUM(amount) where status='REFUNDED'
+    //refundRate: number; // (refunds / successful) * 100
+
+    //byProvider: Array<{
+      //provider: string;
+      //refundCount: number;
+      //refundAmount: string;
+    //}>;
+  ////};
+
+  
+
 }

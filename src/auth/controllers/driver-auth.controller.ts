@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Req, UseGuards, Logger } from '@nestjs/common';
 import { AuthService } from '../auth.service';
 import { LoginDto } from '../dto/driver/login.dto';
-import { SelectTenantDto } from '../dto/driver/select-tenant.dto';
+import * as selectTenantDto from "../dto/driver/select-tenant-dto";
 import { Public } from 'src/decorators/public.decorator';
 import { UniversalV1Guard } from '../guards/universal-v1.guard';
 
@@ -33,7 +33,7 @@ export class DriverAuthController {
   @Public()
   @Post('select-tenant-v1')
   async selectTenantDriverV1(
-    @Body() dto: SelectTenantDto,
+    @Body() dto: selectTenantDto.SelectTenantDto,
     @Req() req: Request,
   ) {
     try {

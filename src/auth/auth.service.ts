@@ -88,8 +88,6 @@ export class AuthService {
     }
   }
 
-  
-
   async loginDriverV1(dto: DriverLoginDto) {
     try {
       this.logger.log(`LoginDriverV1 attempt for email: ${dto.email}`);
@@ -267,15 +265,15 @@ export class AuthService {
         `Profile found: ${profile.id} for user: ${decoded.sub} in tenant: ${dto.tenantId}`,
       );
 
-     const { access_token: accessToken, expires_in } =
-       await this.generateUnifiedAccessToken(
-         profile.user!.id,
-         profile.user!.email,
-         'DRIVER',
-         profile.tenantId,
-         profile.tenant.name,
-         profile.id,
-       );
+      const { access_token: accessToken, expires_in } =
+        await this.generateUnifiedAccessToken(
+          profile.user!.id,
+          profile.user!.email,
+          'DRIVER',
+          profile.tenantId,
+          profile.tenant.name,
+          profile.id,
+        );
 
       return {
         access_token: accessToken,
@@ -411,7 +409,6 @@ export class AuthService {
     };
   }
 
-
   /**
    * EXCHANGE (Step 2) — ADMIN/MANAGER:
    * Accepts { loginTicket, tenantId } and returns the final tenant-scoped access token.
@@ -458,8 +455,6 @@ export class AuthService {
     };
   }
 
- 
-
   /**
    * User self-register — creates a tenant and an ADMIN membership,
    * then returns a tenant-scoped admin token.
@@ -477,7 +472,6 @@ export class AuthService {
       data: {
         email: registerDto.email,
         passwordHash,
-        username: registerDto.username,
         status: 'ACTIVE',
       },
       select: { id: true, email: true },

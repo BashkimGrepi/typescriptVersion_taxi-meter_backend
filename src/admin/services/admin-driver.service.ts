@@ -12,10 +12,15 @@ import {
   DriversPageResponse,
   DriverStatus,
 } from '../dto/driver-admin.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AdminDriverService {
   constructor(private prisma: PrismaService) {}
+
+  private async hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, 10);
+  }
 
   async getDrivers(
     tenantId: string,
@@ -77,8 +82,28 @@ export class AdminDriverService {
     tenantId: string,
     data: CreateDriverDto,
   ): Promise<DriverResponseDto> {
+    // First create a User account for the driver
+    const user = await this.prisma.user.create({
+      data: {
+        email: data.email,
+        passwordHash: await this.hashPassword('ChangeMe123!'), // Temporary password
+        status: 'ACTIVE',
+      },
+    });
+
+    // Create membership linking user to tenant as DRIVER
+    await this.prisma.membership.create({
+      data: {
+        userId: user.id,
+        tenantId,
+        role: 'DRIVER',
+      },
+    });
+
+    // Then create the driver profile
     const driver = await this.prisma.driverProfile.create({
       data: {
+        userId: user.id,
         tenantId,
         firstName: data.firstName,
         lastName: data.lastName,
