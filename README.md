@@ -49,7 +49,7 @@ This system serves as the backbone for a taxi/ride-hailing platform, handling:
 
 - **Multi-tenancy**: Isolates data and operations for different taxi companies
 - **Driver Operations**: Complete lifecycle management for drivers and ride execution
-- **Payment Processing**: Integrated with Stripe Connect and Viva Wallet for seamless transactions
+- **Payment Processing**: Integrated with Viva Wallet for seamless transactions
 - **Administrative Control**: Comprehensive dashboards for fleet managers and admins
 - **Compliance & Reporting**: Automated receipt generation and financial reporting
 
@@ -71,6 +71,23 @@ This system serves as the backbone for a taxi/ride-hailing platform, handling:
 - Invitation system for onboarding drivers and managers
 - Tenant-specific configuration and branding support
 
+### 🚗 **Driver Activities**
+
+- Start / pause / Resume / End Ride functionalities
+    - Ride lifesycle managment (DRAFT -> ONGOING -> COMPLETED/CANCELLED)
+- Real-Time meter inerface
+    - Live timer
+    - Distance tracking (GPS-ready)
+    - Fare calculation engine
+      - Multi-component pricing model
+          - Base fare
+          - time-based rate
+          - Optional surcharge multiplier
+    - Payment record creation
+        - cash or viva payment confirmation
+    - Viva
+        - webhook processing
+      
 ### 🚗 **Ride Management**
 
 - Real-time ride tracking and status management
