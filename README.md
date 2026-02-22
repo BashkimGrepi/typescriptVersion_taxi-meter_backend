@@ -9,9 +9,9 @@
 ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
-Multi-tenant taxi fleet management system with integrated payment processing, real-time ride tracking, and comprehensive admin capabilities.
+Multi-tenant taxi fleet management backend with integrated payment processing, real-time ride lifecycle control, and enterprise-grade administrative tooling.
 
-> **⚠️ Development Status**: This project is currently under active development. Features and APIs may change.
+> **⚠️ Development Status**: This project is under active development. Core functionality is operational, but APIs and features may evolve.
 
 [Features](#-key-features) • [Architecture](#-system-architecture) • [Getting Started](#-getting-started) • [API Docs](#-api-documentation)
 
@@ -21,62 +21,169 @@ Multi-tenant taxi fleet management system with integrated payment processing, re
 
 ## 🎯 Overview
 
-> **📌 Note**: This system is currently in active development. While core features are functional, some features may be incomplete or subject to change.
+### The Mission
 
-### 🚕 Taxi Meter Backend
+Taxi Meter API is built to modernize and digitize the operational backbone of independent taxi companies.
 
-**Taxi Meter Backend** is a **multi-tenant SaaS backend** built to power digital taxi meter systems for independent taxi companies.
-The system enables multiple taxi companies (tenants) to operate independently within a single platform while maintaining strict data isolation and role-based access control. Each tenant manages its own drivers, rides, pricing policies, and payment provider integrations.
+Traditional taxi environments rely on fragmented hardware and disconnected systems:
 
-#### 🎯 The backend is designed to:
+- Physical taxi meters for fare calculation
 
-- ✅ Handle real-time ride lifecycle management
-- ✅ Perform authoritative fare calculations
-- ✅ Process payments via Stripe Connect and Viva Wallet
-- ✅ Enforce tenant-level data isolation
-- ✅ Provide reporting and analytics for administrators
-- ✅ Support secure driver authentication for mobile applications
+- Separate card terminals for payment processing
 
-#### 👥 This backend serves:
+- Manual shift and earnings tracking
 
-| Role                     | Description                                    |
-| ------------------------ | ---------------------------------------------- |
-| 🧑‍💼 **Administrators**    | Taxi company administrators (web admin portal) |
-| 🚗 **Drivers**           | Drivers (mobile application)                   |
-| 💳 **Payment Providers** | Payment providers (via OAuth + webhooks)       |
+- Paper-based receipts
 
----
+- Disconnected reporting tools
 
-## 🏗 Architecture Philosophy
+> This backend replaces that fragmented ecosystem with a unified, software-driven infrastructure.
 
-This backend follows a **multi-tenant, stateless, API-first architecture**:
+### 🚀 The Platform
 
-### 🔐 Multi-Tenant Isolation
+Taxi Meter API consolidates:
 
-Every ride, payment, driver, and pricing policy is strictly scoped to a tenant.
+- Server-authoritative fare calculation
 
-### 🔄 Stateless Authentication
+- Ride lifecycle management
 
-JWT-based authentication ensures horizontal scalability and containerized deployment readiness.
+- Integrated card payment processing (Stripe Connect, Viva Wallet)
 
-### 💰 Server-Authoritative Financial Logic
+- Automated receipt and payment records
 
-All fare calculations and payment state transitions are handled server-side to guarantee financial integrity.
+- Centralized driver and tenant management
 
-### ⚡ Idempotent Payment Processing
+- Real-time operational reporting
 
-Webhook handling prevents duplicate processing and ensures consistency in distributed payment workflows.
+Instead of multiple independent devices and manual processes, taxi companies operate through a single scalable backend system powering both mobile and web applications.
 
----
+### 🏢 Multi-Tenant SaaS Architecture
 
-## 🎯 Core Responsibilities
+Taxi Meter API is designed as a shared multi-tenant infrastructure, allowing multiple taxi companies to operate independently within the same backend environment.
 
-The backend is responsible for:
+Each tenant has:
 
-- 📊 Managing ride lifecycle (DRAFT → ONGOING → COMPLETED)
-- 💵 Calculating fares based on active pricing policies
-- 💳 Creating and updating payment records
-- 🔔 Processing payment provider webhooks
-- 👤 Managing tenant-based driver accounts
-- 🔒 Enforcing role-based access control (ADMIN, MANAGER, DRIVER)
-- 📈 Generating reports and financial summaries
+- Isolated rides
+
+- Isolated drivers
+
+- Independent pricing policies
+
+- Separate payment provider accounts
+
+- Role-based access control
+
+This architecture enables:
+
+- Centralized maintenance
+
+- Scalable infrastructure
+
+- Reduced operational overhead
+
+- Strict data segregation between companies
+
+The system is built to scale horizontally while maintaining financial and operational integrity.
+
+### 🧠 Core Operational Engine
+
+The backend acts as the central control layer for:
+
+- 📱 Driver mobile application
+
+- 🖥️ Administrative management portal
+
+- 💳 Payment provider integrations (OAuth + Webhooks)
+
+It ensures consistency, financial accuracy, and tenant-level isolation across all system components.
+
+### ⚙️ What the Backend Handles
+
+#### 🚗 Ride Lifecycle Management
+
+- State machine: DRAFT → ONGOING → COMPLETED | CANCELLED
+
+- Single active ride enforcement per driver
+
+- Server-side timestamp authority
+
+- Idempotent ride completion logic
+
+#### 💰 Authoritative Fare Calculation
+
+- Base fare + time rate + distance rate
+   or
+- Fixed pricing
+   or
+- Custom pricing
+
+- Tax calculation
+
+- Decimal-safe financial precision
+
+- Active pricing policy enforcement per tenant
+
+#### 💳 Payment Processing
+
+- Viva Wallet integration
+
+- Automatic payment record creation
+
+- Webhook-based status synchronization
+
+- Idempotent payment event handling
+
+#### 👥 Access Control & Authentication
+
+- JWT-based authentication
+
+- Role-based access control (ADMIN, MANAGER, DRIVER)
+
+- Tenant-scoped authorization
+
+- Secure driver profile validation
+
+#### 📊 Reporting & Aggregation
+
+- Ride summaries
+
+- Earnings reports
+
+- Time-based filtering
+
+- Financial reconciliation data
+
+#### 🏗 Architecture Philosophy
+
+Taxi Meter API follows a stateless, API-first, financially authoritative backend design.
+
+#### 🔐 Tenant Isolation
+
+Every entity (ride, payment, driver, pricing policy) is strictly scoped to a tenant (company).
+
+#### 🔄 Stateless Authentication
+
+JWT-based authentication enables horizontal scalability and containerized deployments.
+
+#### 💰 Financial Authority
+
+All pricing calculations and payment transitions are handled server-side to guarantee consistency and prevent manipulation.
+
+#### ⚡ Idempotent Payment Handling
+
+Webhook events are stored and validated to prevent duplicate processing and ensure reliable distributed payment flows.
+
+### 👥 System Actors
+
+| Role | Responsibility |
+|------|----------------|
+| 🧑‍💼 **Administrators** | Manage drivers, pricing, payments, and reports |
+| 🚗 **Drivers** | Operate rides via mobile application |
+| 💳 **Payment Providers** | Process transactions via OAuth + webhook events |
+
+
+### 📌 Why This Matters
+
+Taxi Meter API transforms taxi operations from hardware-dependent workflows into a scalable, cloud-based platform.
+
+It reduces operational complexity, improves financial transparency, and enables independent taxi companies to compete with modern ride-hailing platforms — without sacrificing ownership or control of their business.
