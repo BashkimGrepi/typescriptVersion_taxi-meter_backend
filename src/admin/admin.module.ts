@@ -11,6 +11,7 @@ import { AdminRideService } from './services/admin-ride.service';
 import { AdminPaymentService } from './services/admin-payment.service';
 import { AdminReportService } from './services/admin-report.service';
 import { AdminProfileService } from './services/admin-profile.service';
+import { NewRidesService } from './newRides/services/newRides-service';
 
 // Controllers
 import { AdminDriverController } from './controllers/admin-driver.controller';
@@ -22,6 +23,9 @@ import { AdminProfileController } from './controllers/admin-profile.controller';
 import { AdminRideController } from './controllers/admin-ride.controller';
 import { AdminDashboardController } from './dashboard/controllers/dashboard.controller';
 import { AdminDashboardService } from './dashboard/services/admin-dashboard.service';
+import { NewRidesController } from './newRides/controllers/newRides.controller';
+import { PaymentsTransactionsService } from './newPaymetns&Transactions.ts/services/paymentsTransactions.service';
+import { PaymentsTransactionsController } from './newPaymetns&Transactions.ts/controllers/paymentsTransactions.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -65,6 +69,16 @@ import { AdminDashboardService } from './dashboard/services/admin-dashboard.serv
       useClass: AdminDashboardService,
       scope: Scope.REQUEST,
     },
+    {
+      provide: NewRidesService,
+      useClass: NewRidesService,
+      scope: Scope.REQUEST,
+    },
+    {
+      provide: PaymentsTransactionsService,
+      useClass: PaymentsTransactionsService,
+      scope: Scope.REQUEST,
+    },
   ],
   controllers: [
     AdminDriverController,
@@ -74,6 +88,8 @@ import { AdminDashboardService } from './dashboard/services/admin-dashboard.serv
     AdminProfileController,
     AdminRideController,
     AdminDashboardController,
+    NewRidesController,
+    PaymentsTransactionsController,
   ],
   exports: [
     // Export services if needed by other modules
@@ -84,6 +100,8 @@ import { AdminDashboardService } from './dashboard/services/admin-dashboard.serv
     AdminReportService,
     AdminProfileService,
     AdminDashboardService,
+    NewRidesService,
+    PaymentsTransactionsService,
   ],
 })
 export class AdminModule {}

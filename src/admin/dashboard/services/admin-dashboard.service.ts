@@ -21,7 +21,7 @@ export class AdminDashboardService extends TenantScopedService {
     super(request);
   }
 
-  async getDateRange(
+   async getDateRange(
     tenantId: string,
     period: 'all_time' | 'current_month' | 'today',
   ): Promise<{ fromDate: Date; toDate: Date }> {
@@ -161,7 +161,7 @@ export class AdminDashboardService extends TenantScopedService {
   async getPaymentsSummary(
     tenantId: string,
     query: { period: 'all_time' | 'current_month' | 'today' },
-  ): Promise<any> {
+  ): Promise<PaymentSummaryResponse> {
     const { fromDate, toDate } = await this.getDateRange(
       tenantId,
       query.period,

@@ -2,20 +2,16 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   HttpStatus,
   Logger,
   Post,
   Res,
-  UsePipes,
-  ValidationPipe,
+
 } from '@nestjs/common';
 import express from 'express';
 import { VivaWebhookService } from './viva-webhook.service';
 import { Public } from 'src/decorators/public.decorator';
-import { VivaWebhookPayload } from './viva-webhook.dto';
-import { error } from 'console';
-import { stat } from 'fs';
+
 
 @Controller('api/webhooks/viva')
 export class VivaWebhookController {
@@ -62,7 +58,7 @@ export class VivaWebhookController {
         status: 'success',
         message: 'Webhook processed successfully',
       });
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('Error processing viva webhook:', error.stack);
 
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({

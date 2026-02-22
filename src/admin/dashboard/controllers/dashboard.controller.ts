@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Query,
-  Req,
   Request,
   UseGuards,
   ValidationPipe,
