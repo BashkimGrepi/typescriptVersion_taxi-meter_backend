@@ -112,9 +112,9 @@ It ensures consistency, financial accuracy, and tenant-level isolation across al
 #### 💰 Authoritative Fare Calculation
 
 - Base fare + time rate + distance rate
-   or
+  or
 - Fixed pricing
-   or
+  or
 - Custom pricing
 
 - Tax calculation
@@ -175,15 +175,251 @@ Webhook events are stored and validated to prevent duplicate processing and ensu
 
 ### 👥 System Actors
 
-| Role | Responsibility |
-|------|----------------|
-| 🧑‍💼 **Administrators** | Manage drivers, pricing, payments, and reports |
-| 🚗 **Drivers** | Operate rides via mobile application |
+| Role                     | Responsibility                                  |
+| ------------------------ | ----------------------------------------------- |
+| 🧑‍💼 **Administrators**    | Manage drivers, pricing, payments, and reports  |
+| 🚗 **Drivers**           | Operate rides via mobile application            |
 | 💳 **Payment Providers** | Process transactions via OAuth + webhook events |
-
 
 ### 📌 Why This Matters
 
 Taxi Meter API transforms taxi operations from hardware-dependent workflows into a scalable, cloud-based platform.
 
 It reduces operational complexity, improves financial transparency, and enables independent taxi companies to compete with modern ride-hailing platforms — without sacrificing ownership or control of their business.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+Before running the project, ensure you have the following installed:
+
+- **Node.js** (v18 or higher)
+- **PostgreSQL** (v14 or higher)
+- **Redis** (optional, for caching)
+- **Docker** (optional, for containerized setup)
+
+### Installation
+
+1. **Clone the repository**
+
+```bash
+git clone <repository-url>
+cd typescript-version-backend
+```
+
+2. **Install dependencies**
+
+```bash
+npm install
+```
+
+3. **Set up environment variables**
+
+Create a `.env` file in the root directory based on `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Configure the following essential variables:
+
+```env
+# Database
+DATABASE_URL="postgresql://username:password@localhost:5432/taxi_meter_db?schema=public"
+
+# JWT Authentication
+JWT_SECRET=your_jwt_secret_here
+JWT_EXPIRES_IN=7d
+
+
+
+# Viva Wallet Configuration (requires demo/production Viva Wallet account)
+VIVA_MERCHANT_ID=your_viva_merchant_id
+VIVA_WEBHOOK_VERIFICATION_KEY=your_viva_webhook_key
+```
+
+> **⚠️ Payment Provider Setup:**
+>
+> - **Viva Wallet**: Requires a demo or production account from [Viva Wallet Developer Portal](https://developer.viva.com)
+>   - Get `VIVA_MERCHANT_ID` from your merchant settings
+>   - Get `VIVA_WEBHOOK_VERIFICATION_KEY` from webhook configuration
+
+> **Tip**: Generate a secure encryption key with:
+>
+> ```bash
+> node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+> ```
+
+4. **Set up the database**
+
+Run Prisma migrations to create the database schema:
+
+```bash
+npx prisma migrate dev
+```
+
+5. **Seed the database** (optional)
+
+Populate the database with sample data:
+
+```bash
+npm run seed
+```
+
+### Running the Application
+
+#### Development Mode
+
+```bash
+npm run start:dev
+```
+
+The API will be available at `http://localhost:3000`
+
+#### Production Mode
+
+```bash
+npm run build
+npm run start:prod
+```
+
+#### Using Docker Compose
+
+```bash
+docker-compose up -d
+```
+
+This will start PostgreSQL, Redis, and the application in containers.
+
+### Verify Installation
+
+Check if the API is running:
+
+```bash
+curl http://localhost:3000/health/db
+```
+
+---
+
+## 🧪 Testing with Postman
+
+### Quick Start
+
+1. **Import the Postman Collection**
+   - Open Postman
+   - Click **Import** → Select file
+   - Choose: `postman/Taxi-Meter-API.postman_collection.json`
+
+2. **Set Base URL**
+   - The collection automatically uses `http://localhost:3000`
+   - Modify in collection variables if needed
+
+### Postman Testing Cheat Sheet
+
+#### 🔐 Authentication Flow
+
+##### Driver Authentication (V1)
+
+| Step | Endpoint                        | Method | Description                                   |
+| --------------------------------------------- |
+| 1    | `/auth/driver/login-v1`         | POST   | Login with credentials                        |
+| 1a   | _(conditional)_                 | -      | If multi-tenant: receive `loginTicket` + list |
+| 2    | `/auth/driver/select-tenant-v1` | POST   | Select tenant (if required)                   |
+| 3    | `/api/driver/profile`           | GET    | Verify token works (auto-saved)               |
+
+**Sample Login Request:**
+
+```json
+{
+  "email": "driver@demo.com",
+  "password": "DriverPass123!"
+}
+```
+
+**Single Tenant Response:**
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 7776000
+}
+```
+
+**Multi-Tenant Response (requires tenant selection):**
+
+```json
+{
+  "requiresTenantSelection": true,
+  "tenants": [
+    { "tenantId": "abc-123", "tenantName": "Helsinki Taxi" },
+    { "tenantId": "def-456", "tenantName": "Tampere Taxi" }
+  ],
+  "loginTicket": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Select Tenant Request (Step 2):**
+
+```json
+{
+  "loginTicket": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "tenantId": "abc-123"
+}
+```
+
+##### Admin/Manager Authentication
+
+| Step | Endpoint                    | Method | Description                                   |
+| ---- | --------------------------- | ------ | --------------------------------------------- |
+| 1    | `/auth/admin/login`         | POST   | Login with credentials (optional: tenantId)   |
+| 1a   | _(conditional)_             | -      | If multi-tenant: receive `loginTicket` + list |
+| 2    | `/auth/admin/select-tenant` | POST   | Select tenant (if required)                   |
+
+> **Note**: Tokens are automatically saved to collection variables after successful authentication. The `loginTicket` is a short-lived token (5 minutes) used only for tenant selection.
+
+#### 🚗 Driver Endpoints
+
+| Endpoint                         | Method | Auth Required | Description        |
+| -------------------------------- | ------ | ------------- | ------------------ |
+| `/api/driver/profile`            | GET    | ✅            | Get driver profile |
+| `/api/driver/rides/active`       | GET    | ✅            | Get active ride    |
+| `/api/driver/rides/history`      | GET    | ✅            | Get ride history   |
+| `/api/driver/rides/start`        | POST   | ✅            | Start a new ride   |
+| `/api/driver/rides/:id/complete` | PATCH  | ✅            | Complete a ride    |
+
+#### 🧑‍💼 Admin Endpoints
+
+| Endpoint                     | Method | Auth Required | Description           |
+| ---------------------------- | ------ | ------------- | --------------------- |
+| `/api/admin/drivers`         | GET    | ✅            | List all drivers      |
+| `/api/admin/drivers`         | POST   | ✅            | Create new driver     |
+| `/api/admin/rides`           | GET    | ✅            | List all rides        |
+| `/api/admin/reports/summary` | GET    | ✅            | Get financial summary |
+
+#### 💳 Payment Endpoints
+
+| Endpoint                   | Method | Auth Required | Description                 |
+| -------------------------- | ------ | ------------- | --------------------------- |
+| `/api/payments/:id`        | GET    | ✅            | Get payment details         |
+| `/api/payments/:id/status` | PATCH  | ✅            | Update payment status       |
+| `/viva/webhook`            | POST   | ❌            | Viva Wallet webhook handler |
+
+### Testing Tips
+
+- 📁 **Collections Available:**
+  - `Taxi-Meter-API.postman_collection.json` - Full API endpoints
+  - `admin-reports.postman_collection.json` - Admin reporting endpoints
+  - `pricing-policies.postman_collection.json` - Pricing management
+
+- 🔄 **Auto-Authentication:** JWT tokens are automatically captured and reused
+- 📚 **Detailed Guide:** See [postman/TESTING_GUIDE.md](postman/TESTING_GUIDE.md) for complete testing scenarios
+- 🐛 **Debugging:** Enable "Console" in Postman to see detailed request/response logs
+
+---
+
+## 📝 Documentation Notice
+
+> **Note**: This README and portions of the project documentation were created with assistance from AI tools to ensure clarity, consistency, and comprehensive coverage of the system architecture and features.
